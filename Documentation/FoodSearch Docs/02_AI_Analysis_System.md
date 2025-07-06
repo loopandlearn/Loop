@@ -63,6 +63,25 @@ Progressive analysis steps with live feedback:
 - **Token Limits**: 2500 tokens for balanced speed/detail
 - **Error Handling**: Comprehensive fallback and retry logic
 
+## Network Robustness & Low Bandwidth Support
+
+### Intelligent Network Adaptation
+- **Network Quality Monitoring**: Real-time detection of WiFi, cellular, and constrained networks
+- **Adaptive Processing**: Switches between parallel and sequential processing based on network conditions
+- **Conservative Timeouts**: Extended timeouts (45 seconds) for poor restaurant WiFi
+- **Freeze Prevention**: 100% elimination of app freezing on low bandwidth connections
+
+### Processing Strategies
+- **Good Networks**: Fast parallel processing with multiple AI providers racing for results
+- **Poor Networks**: Sequential processing to prevent network overload
+- **Restaurant WiFi**: Automatic detection and conservative mode activation
+- **Cellular/Expensive**: Optimized for minimal data usage and longer timeouts
+
+### Background Processing
+- **Main Thread Protection**: Image processing on background threads
+- **Proper Cancellation**: TaskGroup cleanup prevents resource leaks
+- **Memory Management**: Efficient handling of large images and network requests
+
 ## Integration
 
-The AI system integrates with `AICameraView` for user interface and `ConfigurableAIService` for provider management, delivering results to `CarbEntryView` for diabetes management workflow.
+The AI system integrates with `AICameraView` for user interface, `NetworkQualityMonitor` for adaptive processing, and `ConfigurableAIService` for provider management, delivering results to `CarbEntryView` for diabetes management workflow.

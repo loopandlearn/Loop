@@ -14,6 +14,92 @@ import os.log
 import LoopKit
 import CryptoKit
 import SwiftUI
+import Network
+
+// MARK: - Network Quality Monitoring
+
+/// Network quality monitor for determining analysis strategy
+class NetworkQualityMonitor: ObservableObject {
+    static let shared = NetworkQualityMonitor()
+    
+    private let monitor = NWPathMonitor()
+    private let queue = DispatchQueue(label: "NetworkMonitor")
+    
+    @Published var isConnected = false
+    @Published var connectionType: NWInterface.InterfaceType?
+    @Published var isExpensive = false
+    @Published var isConstrained = false
+    
+    private init() {
+        startMonitoring()
+    }
+    
+    private func startMonitoring() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                self?.isConnected = path.status == .satisfied
+                self?.isExpensive = path.isExpensive
+                self?.isConstrained = path.isConstrained
+                
+                // Determine connection type
+                if path.usesInterfaceType(.wifi) {
+                    self?.connectionType = .wifi
+                } else if path.usesInterfaceType(.cellular) {
+                    self?.connectionType = .cellular
+                } else if path.usesInterfaceType(.wiredEthernet) {
+                    self?.connectionType = .wiredEthernet
+                } else {
+                    self?.connectionType = nil
+                }
+            }
+        }
+        monitor.start(queue: queue)
+    }
+    
+    /// Determines if we should use aggressive optimizations
+    var shouldUseConservativeMode: Bool {
+        return !isConnected || isExpensive || isConstrained || connectionType == .cellular
+    }
+    
+    /// Determines if parallel processing is safe
+    var shouldUseParallelProcessing: Bool {
+        return isConnected && !isExpensive && !isConstrained && connectionType == .wifi
+    }
+    
+    /// Gets appropriate timeout for current network conditions
+    var recommendedTimeout: TimeInterval {
+        if shouldUseConservativeMode {
+            return 45.0  // Conservative timeout for poor networks
+        } else {
+            return 25.0  // Standard timeout for good networks
+        }
+    }
+}
+
+// MARK: - Timeout Helper
+
+/// Timeout wrapper for async operations
+private func withTimeoutForAnalysis<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+    return try await withThrowingTaskGroup(of: T.self) { group in
+        // Add the actual operation
+        group.addTask {
+            try await operation()
+        }
+        
+        // Add timeout task
+        group.addTask {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            throw AIFoodAnalysisError.timeout as Error
+        }
+        
+        // Return first result (either success or timeout)
+        defer { group.cancelAll() }
+        guard let result = try await group.next() else {
+            throw AIFoodAnalysisError.timeout as Error
+        }
+        return result
+    }
+}
 
 // MARK: - AI Food Analysis Models
 
@@ -303,6 +389,7 @@ enum AIFoodAnalysisError: Error, LocalizedError {
     case creditsExhausted(provider: String)
     case rateLimitExceeded(provider: String)
     case quotaExceeded(provider: String)
+    case timeout
     
     var errorDescription: String? {
         switch self {
@@ -336,6 +423,8 @@ enum AIFoodAnalysisError: Error, LocalizedError {
             return String(format: NSLocalizedString("%@ rate limit exceeded. Please wait a moment before trying again.", comment: "Error when AI provider rate limit is exceeded"), provider)
         case .quotaExceeded(let provider):
             return String(format: NSLocalizedString("%@ quota exceeded. Please check your usage limits or upgrade your plan.", comment: "Error when AI provider quota is exceeded"), provider)
+        case .timeout:
+            return NSLocalizedString("Analysis timed out. Please check your network connection and try again.", comment: "Error when AI analysis times out")
         }
     }
 }
@@ -927,6 +1016,17 @@ class ConfigurableAIService: ObservableObject {
         }
     }
     
+    /// Safe async image optimization to prevent main thread blocking
+    static func optimizeImageForAnalysisSafely(_ image: UIImage) async -> UIImage {
+        return await withCheckedContinuation { continuation in
+            // Process image on background thread to prevent UI freezing
+            DispatchQueue.global(qos: .userInitiated).async {
+                let optimized = optimizeImageForAnalysis(image)
+                continuation.resume(returning: optimized)
+            }
+        }
+    }
+    
     /// Intelligent image resizing for optimal AI analysis performance
     static func optimizeImageForAnalysis(_ image: UIImage) -> UIImage {
         let maxDimension: CGFloat = 1024
@@ -957,8 +1057,9 @@ class ConfigurableAIService: ObservableObject {
         return UIGraphicsGetImageFromCurrentImageContext() ?? image
     }
     
-    /// Analyze image with parallel providers - returns fastest successful result
+    /// Analyze image with network-aware provider strategy
     func analyzeImageWithParallelProviders(_ image: UIImage, query: String = "") async throws -> AIFoodAnalysisResult {
+        let networkMonitor = NetworkQualityMonitor.shared
         
         // Get available providers that support AI analysis
         let availableProviders: [SearchProvider] = [.googleGemini, .openAI, .claude].filter { provider in
@@ -979,21 +1080,37 @@ class ConfigurableAIService: ObservableObject {
             throw AIFoodAnalysisError.noApiKey
         }
         
+        // Check network conditions and decide strategy
+        if networkMonitor.shouldUseParallelProcessing && availableProviders.count > 1 {
+            print("🌐 Good network detected, using parallel processing with \(availableProviders.count) providers")
+            return try await analyzeWithParallelStrategy(image, providers: availableProviders, query: query)
+        } else {
+            print("🌐 Poor network detected, using sequential processing")
+            return try await analyzeWithSequentialStrategy(image, providers: availableProviders, query: query)
+        }
+    }
+    
+    /// Parallel strategy for good networks
+    private func analyzeWithParallelStrategy(_ image: UIImage, providers: [SearchProvider], query: String) async throws -> AIFoodAnalysisResult {
+        let timeout = NetworkQualityMonitor.shared.recommendedTimeout
         
-        // Use TaskGroup to run providers in parallel - return first successful result
         return try await withThrowingTaskGroup(of: AIFoodAnalysisResult.self) { group in
-            // Add a task for each available provider
-            for provider in availableProviders {
-                group.addTask {
-                    let startTime = Date()
-                    do {
-                        let result = try await self.analyzeWithSingleProvider(image, provider: provider, query: query)
-                        let duration = Date().timeIntervalSince(startTime)
-                        return result
-                    } catch {
-                        let duration = Date().timeIntervalSince(startTime)
-                        print("❌ \(provider.rawValue) failed after \(String(format: "%.1f", duration))s: \(error.localizedDescription)")
-                        throw error
+            // Add timeout wrapper for each provider
+            for provider in providers {
+                group.addTask { [weak self] in
+                    guard let self = self else { throw AIFoodAnalysisError.invalidResponse }
+                    return try await withTimeoutForAnalysis(seconds: timeout) {
+                        let startTime = Date()
+                        do {
+                            let result = try await self.analyzeWithSingleProvider(image, provider: provider, query: query)
+                            let duration = Date().timeIntervalSince(startTime)
+                            print("✅ \(provider.rawValue) succeeded in \(String(format: "%.1f", duration))s")
+                            return result
+                        } catch {
+                            let duration = Date().timeIntervalSince(startTime)
+                            print("❌ \(provider.rawValue) failed after \(String(format: "%.1f", duration))s: \(error.localizedDescription)")
+                            throw error
+                        }
                     }
                 }
             }
@@ -1008,6 +1125,31 @@ class ConfigurableAIService: ObservableObject {
             
             return result
         }
+    }
+    
+    /// Sequential strategy for poor networks - tries providers one by one
+    private func analyzeWithSequentialStrategy(_ image: UIImage, providers: [SearchProvider], query: String) async throws -> AIFoodAnalysisResult {
+        let timeout = NetworkQualityMonitor.shared.recommendedTimeout
+        var lastError: Error?
+        
+        // Try providers one by one until one succeeds
+        for provider in providers {
+            do {
+                print("🔄 Trying \(provider.rawValue) sequentially...")
+                let result = try await withTimeoutForAnalysis(seconds: timeout) {
+                    try await self.analyzeWithSingleProvider(image, provider: provider, query: query)
+                }
+                print("✅ \(provider.rawValue) succeeded in sequential mode")
+                return result
+            } catch {
+                print("❌ \(provider.rawValue) failed in sequential mode: \(error.localizedDescription)")
+                lastError = error
+                // Continue to next provider
+            }
+        }
+        
+        // If all providers failed, throw the last error
+        throw lastError ?? AIFoodAnalysisError.invalidResponse
     }
     
     /// Analyze with a single provider (helper for parallel processing)

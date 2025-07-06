@@ -222,8 +222,6 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             // Clean product information for scanned items
             if let selectedFood = viewModel.selectedFoodProduct {
                 VStack(spacing: 12) {
-                    CardSectionDivider()
-                    
                     // Product image at the top (works for both barcode and AI scanned images)
                     if let capturedImage = viewModel.capturedAIImage {
                         // Show AI captured image
