@@ -354,7 +354,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                     }
                     
                     // Diabetes considerations (expandable)
-                    if let diabetesNotes = aiResult.diabetesConsiderations, !diabetesNotes.isEmpty {
+                    if let diabetesNotes = aiResult.diabetesConsiderations, !diabetesNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         ExpandableNoteView(
                             icon: "heart.fill",
                             iconColor: .red,
@@ -415,11 +415,6 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
         // Set the number of servings from AI analysis AFTER selecting the product
         viewModel.numberOfServings = result.servings
         
-        os_log("🤖 AI food analysis result processed - carbs: %{public}.1fg, servings: %{public}.1f", 
-               log: OSLog(category: "AIFoodAnalysis"), 
-               type: .info, 
-               result.carbohydrates, 
-               result.servings)
     }
     
     /// Convert AI analysis result to OpenFoodFactsProduct for integration with existing workflow

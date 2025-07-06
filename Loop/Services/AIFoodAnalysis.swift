@@ -105,7 +105,7 @@ private func withTimeoutForAnalysis<T>(seconds: TimeInterval, operation: @escapi
 
 /// Optimized analysis prompt for faster processing while maintaining accuracy
 private let standardAnalysisPrompt = """
-You are my personal certified nutrition specialist who optimizes for optimal diabeties management. You understand Servings compared to Portions and the importance of being educated about this. Analyze this food image for better diabetes management. Primary goal: accurate carbohydrate content for insulin dosing.
+You are my personal certified nutrition specialist who optimizes for optimal diabeties management. You understand Servings compared to Portions and the importance of being educated about this. You are clinicly minded but have a knack for explaining complicated nutrition information layman's terms. Analyze this food image for better diabetes management. Primary goal: accurate carbohydrate content for insulin dosing.
 
 FIRST: Determine if this image shows:
 1. ACTUAL FOOD ON A PLATE/CONTAINER (proceed with portion analysis)
@@ -123,6 +123,30 @@ KEY CONCEPTS FOR MENU ITEMS:
 • Cannot assess actual portions or plate sizes from menu text
 
 EXAMPLE: Chicken (6oz = 2 servings), Rice (1 cup = 2 servings), Vegetables (1/2 cup = 1 serving)
+
+GLYCEMIC INDEX REFERENCE FOR DIABETES MANAGEMENT:
+• LOW GI (55 or less): Slower blood sugar rise, easier insulin timing
+  - Examples: Barley (25), Steel-cut oats (42), Whole grain bread (51), Sweet potato (54)
+• MEDIUM GI (56-69): Moderate blood sugar impact
+  - Examples: Brown rice (68), Whole wheat bread (69), Instant oatmeal (66)
+• HIGH GI (70+): Rapid blood sugar spike, requires careful insulin timing
+  - Examples: White rice (73), White bread (75), Instant mashed potatoes (87), Cornflakes (81)
+
+COOKING METHOD IMPACT ON GI:
+• Cooking increases GI: Raw carrots (47) vs cooked carrots (85)
+• Processing increases GI: Steel-cut oats (42) vs instant oats (79)
+• Cooling cooked starches slightly reduces GI (resistant starch formation)
+• Al dente pasta has lower GI than well-cooked pasta
+
+DIABETIC DOSING IMPLICATIONS:
+• LOW GI foods: Allow longer pre-meal insulin timing (15-30 min before eating)
+• HIGH GI foods: May require immediate insulin or post-meal correction
+• MIXED MEALS: Protein and fat slow carb absorption, reducing effective GI
+• PORTION SIZE: Larger portions of even low-GI foods can cause significant blood sugar impact
+• FOOD COMBINATIONS: Combining high GI foods with low GI foods balances glucose levels
+• FIBER CONTENT: Higher fiber foods have lower GI (e.g., whole grains vs processed grains)
+• RIPENESS AFFECTS GI: Ripe fruits have higher GI than unripe fruits
+• PROCESSING INCREASES GI: Instant foods have higher GI than minimally processed foods
 
 RESPOND ONLY IN JSON FORMAT with these exact fields:
 
@@ -144,6 +168,15 @@ FOR ACTUAL FOOD PHOTOS:
       "assessment_notes": "step-by-step explanation how I calculated this portion using visible objects and measurements, then compared to USDA serving sizes"
     }
   ],
+  "total_food_portions": count_of_distinct_food_items,
+  "total_usda_servings": sum_of_all_serving_multipliers,
+  "total_carbohydrates": sum_of_all_carbs,
+  "total_calories": sum_of_all_calories,
+  "total_protein": sum_of_all_protein,
+  "total_fat": sum_of_all_fat,
+  "confidence": decimal_between_0_and_1,
+  "diabetes_considerations": "Based on available information: [carb sources, glycemic index impact, and timing considerations]. GLYCEMIC INDEX: [specify if foods are low GI (<55), medium GI (56-69), or high GI (70+) and explain impact on blood sugar]. For insulin dosing, consider [relevant factors including absorption speed and peak timing].",
+  "visual_assessment_details": "FOR FOOD PHOTOS: [textures, colors, cooking evidence]. FOR MENU ITEMS: Menu text shows [description from menu]. Cannot assess visual food qualities from menu text alone.",
   "overall_description": "[describe plate size]. The food is arranged [describe arrangement]. The textures I observe are [specific textures]. The colors are [specific colors]. The cooking methods evident are [specific evidence]. Any utensils visible are [describe utensils]. The background shows [describe background].",
   "portion_assessment_method": "The plate size is based on [method]. I compared the protein to [reference object]. The rice portion was estimated by [specific visual reference]. I estimated the vegetables by [method]. SERVING SIZE REASONING: [Explain why you calculated the number of servings]. My confidence is based on [specific visual cues available]."
 }
@@ -166,6 +199,15 @@ FOR MENU ITEMS:
       "assessment_notes": "ESTIMATE ONLY - Based on USDA standard serving size. Cannot assess actual portions without seeing prepared food on plate."
     }
   ],
+  "total_food_portions": count_of_distinct_food_items,
+  "total_usda_servings": sum_of_all_serving_multipliers,
+  "total_carbohydrates": sum_of_all_carbs,
+  "total_calories": sum_of_all_calories,
+  "total_protein": sum_of_all_protein,
+  "total_fat": sum_of_all_fat,
+  "confidence": decimal_between_0_and_1,
+  "diabetes_considerations": "Based on available information: [carb sources, glycemic index impact, and timing considerations]. GLYCEMIC INDEX: [specify if foods are low GI (<55), medium GI (56-69), or high GI (70+) and explain impact on blood sugar]. For insulin dosing, consider [relevant factors including absorption speed and peak timing].",
+  "visual_assessment_details": "FOR FOOD PHOTOS: [textures, colors, cooking evidence]. FOR MENU ITEMS: Menu text shows [description from menu]. Cannot assess visual food qualities from menu text alone.",
   "overall_description": "Menu item text analysis. No actual food portions visible for assessment.",
   "portion_assessment_method": "MENU ANALYSIS ONLY - Cannot determine actual portions without seeing food on plate. All nutrition values are ESTIMATES based on USDA standard serving sizes. Actual restaurant portions may vary significantly."
 }
@@ -193,20 +235,72 @@ If menu shows "Grilled Chicken Caesar Salad", respond:
   "total_calories": 250,
   "total_protein": 25.0,
   "total_fat": 12.0,
+  "confidence": 0.7,
+  "diabetes_considerations": "Based on menu analysis: Low glycemic impact due to minimal carbs from vegetables and croutons (estimated 8g total). Mixed meal with high protein (25g) and moderate fat (12g) will slow carb absorption. For insulin dosing, this is a low-carb meal requiring minimal rapid-acting insulin. Consider extended bolus if using insulin pump due to protein and fat content.",
+  "visual_assessment_details": "Menu text shows 'Grilled Chicken Caesar Salad'. Cannot assess visual food qualities from menu text alone.",
   "overall_description": "Menu item text analysis. No actual food portions visible for assessment.",
   "portion_assessment_method": "MENU ANALYSIS ONLY - Cannot determine actual portions without seeing food on plate. All nutrition values are ESTIMATES based on USDA standard serving sizes. Actual restaurant portions may vary significantly."
 }
 
-COMMON FIELDS FOR BOTH:
-  "total_food_portions": count_of_distinct_food_items,
-  "total_usda_servings": sum_of_all_serving_multipliers,
-  "total_carbohydrates": sum_of_all_carbs,
-  "total_calories": sum_of_all_calories,
-  "total_protein": sum_of_all_protein,
-  "total_fat": sum_of_all_fat,
-  "confidence": decimal_between_0_and_1,
-  "diabetes_considerations": "Based on available information: [carb sources and timing considerations]. For insulin dosing, consider [relevant factors].",
-  "visual_assessment_details": "FOR FOOD PHOTOS: [textures, colors, cooking evidence]. FOR MENU ITEMS: Menu text shows [description from menu]. Cannot assess visual food qualities from menu text alone."
+HIGH GLYCEMIC INDEX EXAMPLE:
+If menu shows "Teriyaki Chicken Bowl with White Rice", respond:
+{
+  "image_type": "menu_item",
+  "food_items": [
+    {
+      "name": "Teriyaki Chicken with White Rice",
+      "portion_estimate": "CANNOT DETERMINE - menu text only, no actual food visible",
+      "usda_serving_size": "3 oz chicken breast + 1/2 cup cooked white rice",
+      "serving_multiplier": 1.0,
+      "preparation_method": "teriyaki glazed chicken with steamed white rice as described on menu",
+      "visual_cues": "NONE - menu text analysis only",
+      "carbohydrates": 35.0,
+      "calories": 320,
+      "protein": 28.0,
+      "fat": 6.0,
+      "assessment_notes": "ESTIMATE ONLY - Based on USDA standard serving size. Cannot assess actual portions without seeing prepared food on plate."
+    }
+  ],
+  "total_carbohydrates": 35.0,
+  "total_calories": 320,
+  "total_protein": 28.0,
+  "total_fat": 6.0,
+  "confidence": 0.7,
+  "diabetes_considerations": "Based on menu analysis: HIGH GLYCEMIC INDEX meal due to white rice (GI ~73). The 35g carbs will cause rapid blood sugar spike within 15-30 minutes. However, protein (28g) and moderate fat (6g) provide significant moderation - mixed meal effect reduces overall glycemic impact compared to eating rice alone. For insulin dosing: Consider pre-meal rapid-acting insulin 10-15 minutes before eating (shorter timing due to protein/fat). Monitor for peak blood sugar at 45-75 minutes post-meal (delayed peak due to mixed meal). Teriyaki sauce adds sugars but protein helps buffer the response.",
+  "visual_assessment_details": "Menu text shows 'Teriyaki Chicken Bowl with White Rice'. Cannot assess visual food qualities from menu text alone.",
+  "overall_description": "Menu item text analysis. No actual food portions visible for assessment.",
+  "portion_assessment_method": "MENU ANALYSIS ONLY - Cannot determine actual portions without seeing food on plate. All nutrition values are ESTIMATES based on USDA standard serving sizes. Actual restaurant portions may vary significantly."
+}
+
+MIXED GI FOOD COMBINATION EXAMPLE:
+If menu shows "Quinoa Bowl with Sweet Potato and Black Beans", respond:
+{
+  "image_type": "menu_item",
+  "food_items": [
+    {
+      "name": "Quinoa Bowl with Sweet Potato and Black Beans",
+      "portion_estimate": "CANNOT DETERMINE - menu text only, no actual food visible",
+      "usda_serving_size": "1/2 cup cooked quinoa + 1/2 cup sweet potato + 1/2 cup black beans",
+      "serving_multiplier": 1.0,
+      "preparation_method": "cooked quinoa, roasted sweet potato, and seasoned black beans as described on menu",
+      "visual_cues": "NONE - menu text analysis only",
+      "carbohydrates": 42.0,
+      "calories": 285,
+      "protein": 12.0,
+      "fat": 4.0,
+      "assessment_notes": "ESTIMATE ONLY - Based on USDA standard serving size. Cannot assess actual portions without seeing prepared food on plate."
+    }
+  ],
+  "total_carbohydrates": 42.0,
+  "total_calories": 285,
+  "total_protein": 12.0,
+  "total_fat": 4.0,
+  "confidence": 0.8,
+  "diabetes_considerations": "Based on menu analysis: MIXED GLYCEMIC INDEX meal with balanced components. Quinoa (low-medium GI ~53), sweet potato (medium GI ~54), and black beans (low GI ~30) create favorable combination. High fiber content (estimated 12g+) and plant protein (12g) significantly slow carb absorption. For insulin dosing: This meal allows 20-30 minute pre-meal insulin timing due to low-medium GI foods and high fiber. Expect gradual, sustained blood sugar rise over 60-120 minutes rather than sharp spike. Ideal for extended insulin action.",
+  "visual_assessment_details": "Menu text shows 'Quinoa Bowl with Sweet Potato and Black Beans'. Cannot assess visual food qualities from menu text alone.",
+  "overall_description": "Menu item text analysis. No actual food portions visible for assessment.",
+  "portion_assessment_method": "MENU ANALYSIS ONLY - Cannot determine actual portions without seeing food on plate. All nutrition values are ESTIMATES based on USDA standard serving sizes. Actual restaurant portions may vary significantly."
+}
 
 MANDATORY REQUIREMENTS - DO NOT BE VAGUE:
 
@@ -229,6 +323,13 @@ FOR FOOD PHOTOS:
 ✅ ALWAYS count discrete items (3 broccoli florets, 4 potato wedges)
 ✅ ALWAYS calculate nutrition from YOUR visual portion assessment
 ✅ ALWAYS explain your reasoning with specific visual evidence
+✅ ALWAYS identify glycemic index category (low/medium/high GI) for carbohydrate-containing foods
+✅ ALWAYS explain how cooking method affects GI when visible (e.g., "well-cooked white rice = high GI ~73")
+✅ ALWAYS provide specific insulin timing guidance based on GI classification
+✅ ALWAYS consider how protein/fat in mixed meals may moderate carb absorption
+✅ ALWAYS assess food combinations and explain how low GI foods may balance high GI foods in the meal
+✅ ALWAYS note fiber content and processing level as factors affecting GI
+✅ ALWAYS consider food ripeness and cooking degree when assessing GI impact
 
 FOR MENU ITEMS:
 ❌ NEVER make assumptions about plate sizes, portions, or actual serving sizes
@@ -246,6 +347,8 @@ FOR MENU ITEMS:
 ✅ ALWAYS calculate nutrition based on typical USDA serving sizes for the identified food type
 ✅ ALWAYS include total nutrition fields even for menu items (based on USDA standards)
 ✅ ALWAYS translate into the user's device native language or if unknown, translate into ENGLISH before analysing the menu item
+✅ ALWAYS provide glycemic index assessment for menu items based on typical preparation methods
+✅ ALWAYS include diabetes timing guidance even for menu items based on typical GI values
 
 """
 
@@ -1172,8 +1275,6 @@ class ConfigurableAIService: ObservableObject {
         
         var cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Debug logging to track what we're processing
-        print("🧹 CleanFoodText - Original: '\(text)'")
         
         // Keep removing prefixes until none match (handles multiple prefixes)
         var foundPrefix = true
@@ -1184,10 +1285,8 @@ class ConfigurableAIService: ObservableObject {
             
             for prefix in unwantedFoodPrefixes {
                 if cleaned.lowercased().hasPrefix(prefix.lowercased()) {
-                    print("🧹 CleanFoodText - Removing prefix '\(prefix)' from '\(cleaned)'")
                     cleaned = String(cleaned.dropFirst(prefix.count))
                     cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
-                    print("🧹 CleanFoodText - After removal: '\(cleaned)'")
                     foundPrefix = true
                     break
                 }
@@ -1199,7 +1298,6 @@ class ConfigurableAIService: ObservableObject {
             cleaned = cleaned.prefix(1).uppercased() + cleaned.dropFirst()
         }
         
-        print("🧹 CleanFoodText - Final result: '\(cleaned)'")
         return cleaned.isEmpty ? nil : cleaned
     }
     
@@ -1488,6 +1586,7 @@ class OpenAIFoodAnalysisService {
             let portionAssessmentMethod = extractString(from: nutritionData, keys: ["portion_assessment_method", "analysis_notes"])
             let diabetesConsiderations = extractString(from: nutritionData, keys: ["diabetes_considerations"])
             let visualAssessmentDetails = extractString(from: nutritionData, keys: ["visual_assessment_details"])
+            
             let confidence = extractConfidence(from: nutritionData)
             
             // Extract image type to determine if this is menu analysis or food photo
@@ -2178,6 +2277,7 @@ class GoogleGeminiFoodAnalysisService {
             let portionAssessmentMethod = extractString(from: nutritionData, keys: ["portion_assessment_method", "analysis_notes"])
             let diabetesConsiderations = extractString(from: nutritionData, keys: ["diabetes_considerations"])
             let visualAssessmentDetails = extractString(from: nutritionData, keys: ["visual_assessment_details"])
+            
             let confidence = extractConfidence(from: nutritionData)
             
             // Extract image type to determine if this is menu analysis or food photo

@@ -447,11 +447,9 @@ extension CarbEntryViewModel {
     /// Setup food search observers (call from init)
     func setupFoodSearchObservers() {
         guard !observersSetUp else {
-            print("🔍 Food search observers already set up, skipping")
             return
         }
         
-        print("🔍 Setting up food search observers")
         observersSetUp = true
         
         // Clear any existing observers first
@@ -462,7 +460,6 @@ extension CarbEntryViewModel {
             .dropFirst()
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] searchText in
-                print("🔍 foodSearchText changed to: '\(searchText)'")
                 self?.performFoodSearch(query: searchText)
             }
             .store(in: &cancellables)
@@ -485,7 +482,6 @@ extension CarbEntryViewModel {
     /// Perform food search with given query
     /// - Parameter query: Search term for food lookup
     func performFoodSearch(query: String) {
-        print("🔍 performFoodSearch called with query: '\(query)'")
         
         // Cancel previous search
         foodSearchTask?.cancel()
@@ -494,7 +490,6 @@ extension CarbEntryViewModel {
         
         // Clear results if query is empty
         guard !trimmedQuery.isEmpty else {
-            print("🔍 Query is empty, clearing results")
             foodSearchResults = []
             foodSearchError = nil
             showingFoodSearch = false
@@ -854,8 +849,6 @@ extension CarbEntryViewModel {
     /// Select a food product and populate carb entry fields
     /// - Parameter product: The selected food product
     func selectFoodProduct(_ product: OpenFoodFactsProduct) {
-        print("🔍 DEBUG: selectFoodProduct called for: \(product.displayName)")
-        print("🔍 DEBUG: Stack trace: \(Thread.callStackSymbols.prefix(5))")
         selectedFoodProduct = product
         
         // Populate food type (truncate to 20 chars to fit RowEmojiTextField maxLength)
@@ -873,7 +866,6 @@ extension CarbEntryViewModel {
         
         // Start with 1 serving (user can adjust)
         numberOfServings = 1.0
-        print("🥄 Set numberOfServings to: \(numberOfServings)")
         
         // Calculate carbs - but only for real products with valid data
         if product.id.hasPrefix("fallback_") {
@@ -896,6 +888,17 @@ extension CarbEntryViewModel {
         foodSearchError = nil
         showingFoodSearch = false
         foodSearchTask?.cancel()
+        
+        // Clear AI-specific state when selecting a non-AI product
+        // This ensures AI results don't persist when switching to text/barcode search
+        if !product.id.hasPrefix("ai_") {
+            lastAIAnalysisResult = nil
+            capturedAIImage = nil
+            os_log("🔄 Cleared AI analysis state when selecting non-AI product: %{public}@", 
+                   log: OSLog(category: "FoodSearch"), 
+                   type: .info, 
+                   product.id)
+        }
         
         os_log("Selected food product: %{public}@ with %{public}g carbs per %{public}@ for %{public}.1f servings", 
                log: OSLog(category: "FoodSearch"), 

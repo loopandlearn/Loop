@@ -65,7 +65,7 @@ struct FoodSearchBar: View {
             .frame(maxWidth: .infinity) // Allow search field to expand
             
             // Right-aligned buttons group
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 // Barcode scan button
                 Button(action: {
                     print("🔍 DEBUG: Barcode button tapped")
