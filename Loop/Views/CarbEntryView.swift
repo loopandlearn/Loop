@@ -231,9 +231,9 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                             .frame(width: 120, height: 90)
                             .clipped()
                             .cornerRadius(12)
-                    } else if let imageURL = selectedFood.imageFrontUrl ?? selectedFood.imageUrl, !imageURL.isEmpty {
+                    } else if let imageUrl = selectedFood.imageFrontUrl ?? selectedFood.imageUrl, !imageUrl.isEmpty {
                         // Show barcode product image from URL
-                        AsyncImage(url: URL(string: imageURL)) { image in
+                        AsyncImage(url: URL(string: imageUrl)) { image in
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
@@ -1151,7 +1151,7 @@ struct QuickSearchSuggestions: View {
 
 /// Product image view for displaying scanned product photos
 struct ProductImageView: View {
-    let imageURL: String
+    let imageUrl: String
     let productName: String
     
     @State private var isLoading = true
@@ -1177,7 +1177,7 @@ struct ProductImageView: View {
                     }
                 } else {
                     // Async image loading
-                    AsyncImage(url: URL(string: imageURL)) { image in
+                    AsyncImage(url: URL(string: imageUrl)) { image in
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -1203,7 +1203,7 @@ struct ProductImageView: View {
                         isLoading = true
                         loadError = false
                     }
-                    .onChange(of: imageURL) { _ in
+                    .onChange(of: imageUrl) { _ in
                         isLoading = true
                         loadError = false
                     }

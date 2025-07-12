@@ -419,7 +419,7 @@ extension OpenFoodFactsProduct {
     }
     
     // Simplified initializer for programmatic creation
-    init(id: String, productName: String, brands: String, nutriments: Nutriments, servingSize: String, imageURL: String?) {
+    init(id: String, productName: String, brands: String, nutriments: Nutriments, servingSize: String, imageUrl: String?) {
         self.id = id
         self.productName = productName
         self.brands = brands
@@ -427,8 +427,8 @@ extension OpenFoodFactsProduct {
         self.nutriments = nutriments
         self.servingSize = servingSize
         self.servingQuantity = 100.0
-        self.imageUrl = imageURL
-        self.imageFrontUrl = imageURL
+        self.imageUrl = imageUrl
+        self.imageFrontUrl = imageUrl
         self.code = nil
     }
 }

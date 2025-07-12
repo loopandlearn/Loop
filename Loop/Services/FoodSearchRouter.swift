@@ -243,7 +243,10 @@ class FoodSearchRouter {
                 brands: "Claude AI Analysis",
                 nutriments: nutriments,
                 servingSize: result.foodItemsDetailed.first?.portionEstimate ?? "1 serving",
-                imageURL: nil
+                servingQuantity: nil,
+                imageUrl: nil,
+                imageFrontUrl: nil,
+                code: nil
             )
             
             return [placeholderProduct]
