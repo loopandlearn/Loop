@@ -245,7 +245,7 @@ class FoodSearchRouter {
                 servingSize: result.foodItemsDetailed.first?.portionEstimate ?? "1 serving",
                 servingQuantity: nil,
                 imageURL: nil,
-                imageFrontURL: nil,
+                imageFrontUrl: nil,
                 code: nil
             )
             
