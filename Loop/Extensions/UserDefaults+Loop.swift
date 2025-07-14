@@ -28,6 +28,7 @@ extension UserDefaults {
         case barcodeSearchProvider = "com.loopkit.Loop.barcodeSearchProvider"
         case aiImageProvider = "com.loopkit.Loop.aiImageProvider"
         case analysisMode = "com.loopkit.Loop.analysisMode"
+        case foodSearchEnabled = "com.loopkit.Loop.foodSearchEnabled"
     }
 
     var legacyPumpManagerRawValue: PumpManager.RawValue? {
@@ -338,6 +339,15 @@ MANDATORY REQUIREMENTS:
         }
         set {
             set(newValue, forKey: Key.analysisMode.rawValue)
+        }
+    }
+    
+    var foodSearchEnabled: Bool {
+        get {
+            return bool(forKey: Key.foodSearchEnabled.rawValue)
+        }
+        set {
+            set(newValue, forKey: Key.foodSearchEnabled.rawValue)
         }
     }
 }

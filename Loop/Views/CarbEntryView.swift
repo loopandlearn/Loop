@@ -130,7 +130,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             CarbQuantityRow(quantity: $viewModel.carbsQuantity, isFocused: amountConsumedFocused, title: NSLocalizedString("Amount Consumed", comment: "Label for carb quantity entry row on carb entry screen"), preferredCarbUnit: viewModel.preferredCarbUnit)
             
             // Food search section - moved up from bottom
-            if isNewEntry {
+            if isNewEntry && UserDefaults.standard.foodSearchEnabled {
                 CardSectionDivider()
                 
                 VStack(spacing: 16) {
@@ -194,12 +194,14 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                     // Setup food search observers when the view appears
                     viewModel.setupFoodSearchObservers()
                 }
+                
+                CardSectionDivider()
             }
             
-            CardSectionDivider()
-            
-            // Always show servings row
-            ServingsDisplayRow(
+            // Food-related rows (only show if food search is enabled)
+            if UserDefaults.standard.foodSearchEnabled {
+                // Always show servings row when food search is enabled
+                ServingsDisplayRow(
                 servings: $viewModel.numberOfServings, 
                 servingSize: viewModel.selectedFoodServingSize,
                 selectedFoodProduct: viewModel.selectedFoodProduct
@@ -231,7 +233,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                             .frame(width: 120, height: 90)
                             .clipped()
                             .cornerRadius(12)
-                    } else if let imageURL = selectedFood.imageFrontUrl ?? selectedFood.imageUrl, !imageURL.isEmpty {
+                    } else if let imageURL = selectedFood.imageFrontUrl ?? selectedFood.imageURL, !imageURL.isEmpty {
                         // Show barcode product image from URL
                         AsyncImage(url: URL(string: imageURL)) { image in
                             image
@@ -367,6 +369,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
             }
+            } // End food search enabled section
 
             CardSectionDivider()
             
@@ -454,7 +457,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             nutriments: nutriments,
             servingSize: servingSizeDisplay,
             servingQuantity: 100.0, // Use as base for per-serving calculations
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: nil
         )
@@ -1273,11 +1276,12 @@ struct FoodItemDetailRow: View {
             }
             
             // Portion details
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 if !foodItem.portionEstimate.isEmpty {
-                    HStack {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text("Portion:")
                             .font(.caption)
+                            .fontWeight(.medium)
                             .foregroundColor(.secondary)
                         Text(foodItem.portionEstimate)
                             .font(.caption)
@@ -1286,16 +1290,19 @@ struct FoodItemDetailRow: View {
                 }
                 
                 if let usdaSize = foodItem.usdaServingSize, !usdaSize.isEmpty {
-                    HStack {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text("USDA Serving:")
                             .font(.caption)
+                            .fontWeight(.medium)
                             .foregroundColor(.secondary)
-                        Text(usdaSize)
-                            .font(.caption)
-                            .foregroundColor(.primary)
-                        Text("(×\(String(format: "%.1f", foodItem.servingMultiplier)))")
-                            .font(.caption)
-                            .foregroundColor(.orange)
+                        HStack {
+                            Text(usdaSize)
+                                .font(.caption)
+                                .foregroundColor(.primary)
+                            Text("(×\(String(format: "%.1f", foodItem.servingMultiplier)))")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
                     }
                 }
             }

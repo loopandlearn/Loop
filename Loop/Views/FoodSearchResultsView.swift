@@ -228,8 +228,8 @@ private struct FoodSearchResultRow: View {
         HStack(alignment: .top, spacing: 12) {
                 // Product image with async loading
                 Group {
-                    if let imageUrl = product.imageFrontUrl ?? product.imageUrl, 
-                       let url = URL(string: imageUrl) {
+                    if let imageURL = product.imageFrontUrl ?? product.imageURL, 
+                       let url = URL(string: imageURL) {
                         AsyncImage(url: url) { image in
                             image
                                 .resizable()

@@ -105,10 +105,10 @@ private func withTimeoutForAnalysis<T>(seconds: TimeInterval, operation: @escapi
 
 /// Optimized analysis prompt for faster processing while maintaining accuracy
 private let standardAnalysisPrompt = """
-You are my personal certified nutrition specialist who optimizes for optimal diabeties management. You understand Servings compared to Portions and the importance of being educated about this. You are clinicly minded but have a knack for explaining complicated nutrition information layman's terms. Analyze this food image for better diabetes management. Primary goal: accurate carbohydrate content for insulin dosing.
+You are my personal certified nutrition specialist who optimizes for optimal diabeties management. You understand Servings compared to Portions and the importance of being educated about this. You are clinicly minded but have a knack for explaining complicated nutrition information layman's terms. Analyze this food image for better diabetes management. Primary goal: accurate carbohydrate content for insulin dosing. Do not over estimate the carbs or that could lead to user over dosing on insulin.
 
 FIRST: Determine if this image shows:
-1. ACTUAL FOOD ON A PLATE/CONTAINER (proceed with portion analysis)
+1. ACTUAL FOOD ON A PLATE/PLATTER/CONTAINER (proceed with portion analysis)
 2. MENU TEXT/DESCRIPTIONS (provide USDA standard servings only, clearly marked as estimates)
 
 KEY CONCEPTS FOR ACTUAL FOOD PHOTOS:
@@ -914,14 +914,23 @@ class ConfigurableAIService: ObservableObject {
     
     /// Analyze food image using the configured provider with intelligent caching
     func analyzeFoodImage(_ image: UIImage) async throws -> AIFoodAnalysisResult {
+        return try await analyzeFoodImage(image, telemetryCallback: nil)
+    }
+    
+    /// Analyze food image with telemetry callbacks for progress tracking
+    func analyzeFoodImage(_ image: UIImage, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
         // Check cache first for instant results
         if let cachedResult = imageAnalysisCache.getCachedResult(for: image) {
+            telemetryCallback?("📋 Found cached analysis result")
             return cachedResult
         }
         
+        telemetryCallback?("🎯 Selecting optimal AI provider...")
+        
         // Use parallel processing if enabled
         if enableParallelProcessing {
-            let result = try await analyzeImageWithParallelProviders(image)
+            telemetryCallback?("⚡ Starting parallel provider analysis...")
+            let result = try await analyzeImageWithParallelProviders(image, telemetryCallback: telemetryCallback)
             imageAnalysisCache.cacheResult(result, for: image)
             return result
         }
@@ -933,7 +942,8 @@ class ConfigurableAIService: ObservableObject {
         
         switch provider {
         case .basicAnalysis:
-            result = try await BasicFoodAnalysisService.shared.analyzeFoodImage(image)
+            telemetryCallback?("🧠 Running basic analysis...")
+            result = try await BasicFoodAnalysisService.shared.analyzeFoodImage(image, telemetryCallback: telemetryCallback)
         case .claude:
             let key = UserDefaults.standard.claudeAPIKey
             let query = UserDefaults.standard.claudeQuery
@@ -941,7 +951,8 @@ class ConfigurableAIService: ObservableObject {
                 print("❌ Claude API key not configured")
                 throw AIFoodAnalysisError.noApiKey
             }
-            result = try await ClaudeFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: key, query: query)
+            telemetryCallback?("🤖 Connecting to Claude AI...")
+            result = try await ClaudeFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: key, query: query, telemetryCallback: telemetryCallback)
         case .googleGemini:
             let key = UserDefaults.standard.googleGeminiAPIKey
             let query = UserDefaults.standard.googleGeminiQuery
@@ -949,7 +960,8 @@ class ConfigurableAIService: ObservableObject {
                 print("❌ Google Gemini API key not configured")
                 throw AIFoodAnalysisError.noApiKey
             }
-            result = try await GoogleGeminiFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: key, query: query)
+            telemetryCallback?("🤖 Connecting to Google Gemini...")
+            result = try await GoogleGeminiFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: key, query: query, telemetryCallback: telemetryCallback)
         case .openAI:
             let key = UserDefaults.standard.openAIAPIKey
             let query = UserDefaults.standard.openAIQuery
@@ -957,8 +969,11 @@ class ConfigurableAIService: ObservableObject {
                 print("❌ OpenAI API key not configured")
                 throw AIFoodAnalysisError.noApiKey
             }
-            result = try await OpenAIFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: key, query: query)
+            telemetryCallback?("🤖 Connecting to OpenAI...")
+            result = try await OpenAIFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: key, query: query, telemetryCallback: telemetryCallback)
         }
+        
+        telemetryCallback?("💾 Caching analysis result...")
         
         // Cache the result for future use
         imageAnalysisCache.cacheResult(result, for: image)
@@ -1161,8 +1176,13 @@ class ConfigurableAIService: ObservableObject {
     }
     
     /// Analyze image with network-aware provider strategy
-    func analyzeImageWithParallelProviders(_ image: UIImage, query: String = "") async throws -> AIFoodAnalysisResult {
+    func analyzeImageWithParallelProviders(_ image: UIImage, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
+        return try await analyzeImageWithParallelProviders(image, query: "", telemetryCallback: telemetryCallback)
+    }
+    
+    func analyzeImageWithParallelProviders(_ image: UIImage, query: String = "", telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
         let networkMonitor = NetworkQualityMonitor.shared
+        telemetryCallback?("🌐 Analyzing network conditions...")
         
         // Get available providers that support AI analysis
         let availableProviders: [SearchProvider] = [.googleGemini, .openAI, .claude].filter { provider in
@@ -1186,15 +1206,17 @@ class ConfigurableAIService: ObservableObject {
         // Check network conditions and decide strategy
         if networkMonitor.shouldUseParallelProcessing && availableProviders.count > 1 {
             print("🌐 Good network detected, using parallel processing with \(availableProviders.count) providers")
-            return try await analyzeWithParallelStrategy(image, providers: availableProviders, query: query)
+            telemetryCallback?("⚡ Starting parallel AI provider analysis...")
+            return try await analyzeWithParallelStrategy(image, providers: availableProviders, query: query, telemetryCallback: telemetryCallback)
         } else {
             print("🌐 Poor network detected, using sequential processing")
-            return try await analyzeWithSequentialStrategy(image, providers: availableProviders, query: query)
+            telemetryCallback?("🔄 Starting sequential AI provider analysis...")
+            return try await analyzeWithSequentialStrategy(image, providers: availableProviders, query: query, telemetryCallback: telemetryCallback)
         }
     }
     
     /// Parallel strategy for good networks
-    private func analyzeWithParallelStrategy(_ image: UIImage, providers: [SearchProvider], query: String) async throws -> AIFoodAnalysisResult {
+    private func analyzeWithParallelStrategy(_ image: UIImage, providers: [SearchProvider], query: String, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
         let timeout = NetworkQualityMonitor.shared.recommendedTimeout
         
         return try await withThrowingTaskGroup(of: AIFoodAnalysisResult.self) { group in
@@ -1231,7 +1253,7 @@ class ConfigurableAIService: ObservableObject {
     }
     
     /// Sequential strategy for poor networks - tries providers one by one
-    private func analyzeWithSequentialStrategy(_ image: UIImage, providers: [SearchProvider], query: String) async throws -> AIFoodAnalysisResult {
+    private func analyzeWithSequentialStrategy(_ image: UIImage, providers: [SearchProvider], query: String, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
         let timeout = NetworkQualityMonitor.shared.recommendedTimeout
         var lastError: Error?
         
@@ -1239,6 +1261,7 @@ class ConfigurableAIService: ObservableObject {
         for provider in providers {
             do {
                 print("🔄 Trying \(provider.rawValue) sequentially...")
+                telemetryCallback?("🤖 Trying \(provider.rawValue)...")
                 let result = try await withTimeoutForAnalysis(seconds: timeout) {
                     try await self.analyzeWithSingleProvider(image, provider: provider, query: query)
                 }
@@ -1259,11 +1282,11 @@ class ConfigurableAIService: ObservableObject {
     private func analyzeWithSingleProvider(_ image: UIImage, provider: SearchProvider, query: String) async throws -> AIFoodAnalysisResult {
         switch provider {
         case .googleGemini:
-            return try await GoogleGeminiFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: UserDefaults.standard.googleGeminiAPIKey, query: query)
+            return try await GoogleGeminiFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: UserDefaults.standard.googleGeminiAPIKey, query: query, telemetryCallback: nil)
         case .openAI:
-            return try await OpenAIFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: UserDefaults.standard.openAIAPIKey, query: query)
+            return try await OpenAIFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: UserDefaults.standard.openAIAPIKey, query: query, telemetryCallback: nil)
         case .claude:
-            return try await ClaudeFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: UserDefaults.standard.claudeAPIKey, query: query)
+            return try await ClaudeFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: UserDefaults.standard.claudeAPIKey, query: query, telemetryCallback: nil)
         default:
             throw AIFoodAnalysisError.invalidResponse
         }
@@ -1315,19 +1338,26 @@ class OpenAIFoodAnalysisService {
     private init() {}
     
     func analyzeFoodImage(_ image: UIImage, apiKey: String, query: String) async throws -> AIFoodAnalysisResult {
+        return try await analyzeFoodImage(image, apiKey: apiKey, query: query, telemetryCallback: nil)
+    }
+    
+    func analyzeFoodImage(_ image: UIImage, apiKey: String, query: String, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
         // OpenAI GPT-4 Vision implementation
         guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
             throw AIFoodAnalysisError.invalidResponse
         }
         
         // Get optimal model based on current analysis mode
+        telemetryCallback?("⚙️ Configuring OpenAI parameters...")
         let analysisMode = ConfigurableAIService.shared.analysisMode
         let model = ConfigurableAIService.optimalModel(for: .openAI, mode: analysisMode)
         
         // Optimize image size for faster processing and uploads
+        telemetryCallback?("🖼️ Optimizing image for analysis...")
         let optimizedImage = ConfigurableAIService.optimizeImageForAnalysis(image)
         
         // Convert image to base64 with adaptive compression
+        telemetryCallback?("🔄 Encoding image data...")
         let compressionQuality = ConfigurableAIService.adaptiveCompressionQuality(for: optimizedImage)
         guard let imageData = optimizedImage.jpegData(compressionQuality: compressionQuality) else {
             throw AIFoodAnalysisError.imageProcessingFailed
@@ -1335,6 +1365,7 @@ class OpenAIFoodAnalysisService {
         let base64Image = imageData.base64EncodedString()
         
         // Create OpenAI API request
+        telemetryCallback?("📡 Preparing API request...")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -1370,8 +1401,13 @@ class OpenAIFoodAnalysisService {
             throw AIFoodAnalysisError.requestCreationFailed
         }
         
+        telemetryCallback?("🌐 Sending request to OpenAI...")
+        
         do {
+            telemetryCallback?("⏳ Awaiting result from AI...")
             let (data, response) = try await URLSession.shared.data(for: request)
+            
+            telemetryCallback?("📥 Received response from OpenAI...")
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ OpenAI: Invalid HTTP response")
@@ -1424,6 +1460,7 @@ class OpenAIFoodAnalysisService {
             }
             
             // Parse OpenAI response
+            telemetryCallback?("🔍 Parsing OpenAI response...")
             guard let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 print("❌ OpenAI: Failed to parse response as JSON")
                 print("❌ OpenAI: Raw response data: \(String(data: data, encoding: .utf8) ?? "Unable to decode")")
@@ -1458,6 +1495,7 @@ class OpenAIFoodAnalysisService {
             print("🔧 OpenAI: Received content length: \(content.count)")
             
             // Enhanced JSON extraction from GPT-4's response (like Claude service)
+            telemetryCallback?("⚡ Processing AI analysis results...")
             let cleanedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
                 .replacingOccurrences(of: "```json", with: "")
                 .replacingOccurrences(of: "```", with: "")
@@ -1965,7 +2003,7 @@ class USDAFoodDataService {
             nutriments: nutriments,
             servingSize: "100g", // USDA data is typically per 100g
             servingQuantity: 100.0,
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: String(fdcId)
         )
@@ -2044,7 +2082,12 @@ class GoogleGeminiFoodAnalysisService {
     private init() {}
     
     func analyzeFoodImage(_ image: UIImage, apiKey: String, query: String) async throws -> AIFoodAnalysisResult {
+        return try await analyzeFoodImage(image, apiKey: apiKey, query: query, telemetryCallback: nil)
+    }
+    
+    func analyzeFoodImage(_ image: UIImage, apiKey: String, query: String, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
         print("🍱 Starting Google Gemini food analysis")
+        telemetryCallback?("⚙️ Configuring Gemini parameters...")
         
         // Get optimal model based on current analysis mode
         let analysisMode = ConfigurableAIService.shared.analysisMode
@@ -2057,9 +2100,11 @@ class GoogleGeminiFoodAnalysisService {
         }
         
         // Optimize image size for faster processing and uploads
+        telemetryCallback?("🖼️ Optimizing image for analysis...")
         let optimizedImage = ConfigurableAIService.optimizeImageForAnalysis(image)
         
         // Convert image to base64 with adaptive compression
+        telemetryCallback?("🔄 Encoding image data...")
         let compressionQuality = ConfigurableAIService.adaptiveCompressionQuality(for: optimizedImage)
         guard let imageData = optimizedImage.jpegData(compressionQuality: compressionQuality) else {
             throw AIFoodAnalysisError.imageProcessingFailed
@@ -2101,8 +2146,13 @@ class GoogleGeminiFoodAnalysisService {
             throw AIFoodAnalysisError.requestCreationFailed
         }
         
+        telemetryCallback?("🌐 Sending request to Google Gemini...")
+        
         do {
+            telemetryCallback?("⏳ Awaiting result from AI...")
             let (data, response) = try await URLSession.shared.data(for: request)
+            
+            telemetryCallback?("📥 Received response from Gemini...")
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ Google Gemini: Invalid HTTP response")
@@ -2387,11 +2437,24 @@ class BasicFoodAnalysisService {
     private init() {}
     
     func analyzeFoodImage(_ image: UIImage) async throws -> AIFoodAnalysisResult {
+        return try await analyzeFoodImage(image, telemetryCallback: nil)
+    }
+    
+    func analyzeFoodImage(_ image: UIImage, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
+        telemetryCallback?("📊 Initializing basic analysis...")
         
-        // Simulate analysis time for better UX
-        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+        // Simulate analysis time for better UX with telemetry updates
+        telemetryCallback?("📱 Analyzing image properties...")
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        telemetryCallback?("🍽️ Identifying food characteristics...")
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        telemetryCallback?("📊 Calculating nutrition estimates...")
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         
         // Basic analysis based on image characteristics and common foods
+        telemetryCallback?("⚙️ Processing analysis results...")
         let analysisResult = performBasicAnalysis(image: image)
         
         return analysisResult
@@ -2596,19 +2659,26 @@ class ClaudeFoodAnalysisService {
     private init() {}
     
     func analyzeFoodImage(_ image: UIImage, apiKey: String, query: String) async throws -> AIFoodAnalysisResult {
+        return try await analyzeFoodImage(image, apiKey: apiKey, query: query, telemetryCallback: nil)
+    }
+    
+    func analyzeFoodImage(_ image: UIImage, apiKey: String, query: String, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
         guard let url = URL(string: "https://api.anthropic.com/v1/messages") else {
             throw AIFoodAnalysisError.invalidResponse
         }
         
         // Get optimal model based on current analysis mode
+        telemetryCallback?("⚙️ Configuring Claude parameters...")
         let analysisMode = ConfigurableAIService.shared.analysisMode
         let model = ConfigurableAIService.optimalModel(for: .claude, mode: analysisMode)
         
         
         // Optimize image size for faster processing and uploads
+        telemetryCallback?("🖼️ Optimizing image for analysis...")
         let optimizedImage = ConfigurableAIService.optimizeImageForAnalysis(image)
         
         // Convert image to base64 with adaptive compression
+        telemetryCallback?("🔄 Encoding image data...")
         let compressionQuality = ConfigurableAIService.adaptiveCompressionQuality(for: optimizedImage)
         guard let imageData = optimizedImage.jpegData(compressionQuality: compressionQuality) else {
             throw AIFoodAnalysisError.invalidResponse
@@ -2616,6 +2686,7 @@ class ClaudeFoodAnalysisService {
         let base64Image = imageData.base64EncodedString()
         
         // Prepare the request
+        telemetryCallback?("📡 Preparing API request...")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -2649,8 +2720,13 @@ class ClaudeFoodAnalysisService {
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         
+        telemetryCallback?("🌐 Sending request to Claude...")
+        
         // Make the request
+        telemetryCallback?("⏳ Awaiting result from AI...")
         let (data, response) = try await URLSession.shared.data(for: request)
+        
+        telemetryCallback?("📥 Received response from Claude...")
         
         guard let httpResponse = response as? HTTPURLResponse else {
             print("❌ Claude: Invalid HTTP response")
@@ -2699,6 +2775,7 @@ class ClaudeFoodAnalysisService {
         }
         
         // Parse response
+        telemetryCallback?("🔍 Parsing Claude response...")
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             print("❌ Claude: Failed to parse JSON response")
             print("❌ Claude: Raw response: \(String(data: data, encoding: .utf8) ?? "Unable to decode")")
@@ -2717,6 +2794,7 @@ class ClaudeFoodAnalysisService {
         print("🔧 Claude: Received text length: \(text.count)")
         
         // Parse the JSON response from Claude
+        telemetryCallback?("⚡ Processing AI analysis results...")
         return try parseClaudeAnalysis(text)
     }
     

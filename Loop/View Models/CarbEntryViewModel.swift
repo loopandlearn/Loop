@@ -819,7 +819,7 @@ extension CarbEntryViewModel {
             ),
             servingSize: "Enter serving size",
             servingQuantity: 100.0,
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: barcode,
             dataSource: .barcodeScan
@@ -950,7 +950,7 @@ extension CarbEntryViewModel {
                 nutriments: Nutriments.empty(),
                 servingSize: nil,
                 servingQuantity: nil,
-                imageUrl: nil,
+                imageURL: nil,
                 imageFrontUrl: nil,
                 code: nil,
                 dataSource: .unknown,
@@ -1047,7 +1047,7 @@ extension CarbEntryViewModel {
                     nutriments: product.nutriments,
                     servingSize: product.servingSize,
                     servingQuantity: product.servingQuantity,
-                    imageUrl: product.imageUrl,
+                    imageURL: product.imageURL,
                     imageFrontUrl: product.imageFrontUrl,
                     code: product.code,
                     dataSource: .textSearch
@@ -1066,7 +1066,7 @@ extension CarbEntryViewModel {
                     nutriments: product.nutriments,
                     servingSize: product.servingSize,
                     servingQuantity: product.servingQuantity,
-                    imageUrl: product.imageUrl,
+                    imageURL: product.imageURL,
                     imageFrontUrl: product.imageFrontUrl,
                     code: product.code,
                     dataSource: .textSearch
@@ -1094,7 +1094,7 @@ extension CarbEntryViewModel {
                     nutriments: product.nutriments,
                     servingSize: product.servingSize,
                     servingQuantity: product.servingQuantity,
-                    imageUrl: product.imageUrl,
+                    imageURL: product.imageURL,
                     imageFrontUrl: product.imageFrontUrl,
                     code: product.code,
                     dataSource: .textSearch
@@ -1121,7 +1121,7 @@ extension CarbEntryViewModel {
                     nutriments: product.nutriments,
                     servingSize: product.servingSize,
                     servingQuantity: product.servingQuantity,
-                    imageUrl: product.imageUrl,
+                    imageURL: product.imageURL,
                     imageFrontUrl: product.imageFrontUrl,
                     code: product.code,
                     dataSource: .barcodeScan
@@ -1141,7 +1141,7 @@ extension CarbEntryViewModel {
                     nutriments: product.nutriments,
                     servingSize: product.servingSize,
                     servingQuantity: product.servingQuantity,
-                    imageUrl: product.imageUrl,
+                    imageURL: product.imageURL,
                     imageFrontUrl: product.imageFrontUrl,
                     code: product.code,
                     dataSource: .barcodeScan
@@ -1166,7 +1166,7 @@ extension CarbEntryViewModel {
                     nutriments: product.nutriments,
                     servingSize: product.servingSize,
                     servingQuantity: product.servingQuantity,
-                    imageUrl: product.imageUrl,
+                    imageURL: product.imageURL,
                     imageFrontUrl: product.imageFrontUrl,
                     code: product.code,
                     dataSource: .textSearch
@@ -1194,7 +1194,7 @@ extension CarbEntryViewModel {
                 ),
                 servingSize: result.portionSize.isEmpty ? "1 serving" : result.portionSize,
                 servingQuantity: 100.0,
-                imageUrl: nil,
+                imageURL: nil,
                 imageFrontUrl: nil,
                 code: nil,
                 dataSource: .aiAnalysis
@@ -1221,7 +1221,7 @@ extension CarbEntryViewModel {
                     ),
                     servingSize: "Small \(result.portionSize.isEmpty ? "serving" : result.portionSize.lowercased())",
                     servingQuantity: 100.0,
-                    imageUrl: nil,
+                    imageURL: nil,
                     imageFrontUrl: nil,
                     code: nil,
                     dataSource: .aiAnalysis
@@ -1241,7 +1241,7 @@ extension CarbEntryViewModel {
                     ),
                     servingSize: "Large \(result.portionSize.isEmpty ? "serving" : result.portionSize.lowercased())",
                     servingQuantity: 100.0,
-                    imageUrl: nil,
+                    imageURL: nil,
                     imageFrontUrl: nil,
                     code: nil,
                     dataSource: .aiAnalysis
@@ -1264,7 +1264,7 @@ extension CarbEntryViewModel {
                     nutriments: product.nutriments,
                     servingSize: product.servingSize,
                     servingQuantity: product.servingQuantity,
-                    imageUrl: product.imageUrl,
+                    imageURL: product.imageURL,
                     imageFrontUrl: product.imageFrontUrl,
                     code: product.code,
                     dataSource: .textSearch
@@ -1288,7 +1288,7 @@ extension CarbEntryViewModel {
                     nutriments: product.nutriments,
                     servingSize: product.servingSize,
                     servingQuantity: product.servingQuantity,
-                    imageUrl: product.imageUrl,
+                    imageURL: product.imageURL,
                     imageFrontUrl: product.imageFrontUrl,
                     code: product.code,
                     dataSource: .textSearch
@@ -1335,7 +1335,7 @@ extension CarbEntryViewModel {
                 ),
                 servingSize: result.foodItemsDetailed.first?.portionEstimate ?? "1 serving",
                 servingQuantity: 100.0,
-                imageUrl: nil,
+                imageURL: nil,
                 imageFrontUrl: nil,
                 code: nil,
                 dataSource: .aiAnalysis
@@ -1360,7 +1360,7 @@ extension CarbEntryViewModel {
                 ),
                 servingSize: "Small serving",
                 servingQuantity: 100.0,
-                imageUrl: nil,
+                imageURL: nil,
                 imageFrontUrl: nil,
                 code: nil,
                 dataSource: .aiAnalysis
@@ -1379,7 +1379,7 @@ extension CarbEntryViewModel {
                 ),
                 servingSize: "Large serving",
                 servingQuantity: 100.0,
-                imageUrl: nil,
+                imageURL: nil,
                 imageFrontUrl: nil,
                 code: nil,
                 dataSource: .aiAnalysis
@@ -1400,7 +1400,7 @@ extension CarbEntryViewModel {
                     nutriments: product.nutriments,
                     servingSize: product.servingSize,
                     servingQuantity: product.servingQuantity,
-                    imageUrl: product.imageUrl,
+                    imageURL: product.imageURL,
                     imageFrontUrl: product.imageFrontUrl,
                     code: product.code,
                     dataSource: .textSearch

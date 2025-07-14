@@ -271,7 +271,7 @@ class FoodSearchIntegrationTests: XCTestCase {
             ),
             servingSize: "100g",
             servingQuantity: 100.0,
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: nil
         )
