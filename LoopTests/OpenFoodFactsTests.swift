@@ -114,7 +114,7 @@ class OpenFoodFactsModelsTests: XCTestCase {
             nutriments: Nutriments.sample(),
             servingSize: nil,
             servingQuantity: nil,
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: nil
         )
@@ -128,7 +128,7 @@ class OpenFoodFactsModelsTests: XCTestCase {
             nutriments: Nutriments.sample(),
             servingSize: nil,
             servingQuantity: nil,
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: nil
         )
@@ -144,7 +144,7 @@ class OpenFoodFactsModelsTests: XCTestCase {
             nutriments: Nutriments.sample(carbs: 50.0), // 50g per 100g
             servingSize: "30g",
             servingQuantity: 30.0, // 30g serving
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: nil
         )
@@ -165,7 +165,7 @@ class OpenFoodFactsModelsTests: XCTestCase {
             nutriments: Nutriments.sample(carbs: -1.0),
             servingSize: nil,
             servingQuantity: nil,
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: nil
         )
@@ -179,7 +179,7 @@ class OpenFoodFactsModelsTests: XCTestCase {
             nutriments: Nutriments.sample(),
             servingSize: nil,
             servingQuantity: nil,
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: nil
         )

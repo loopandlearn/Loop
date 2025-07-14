@@ -180,7 +180,7 @@ class FoodSearchRouter {
                 ),
                 servingSize: result.portionSize.isEmpty ? "1 serving" : result.portionSize,
                 servingQuantity: 100.0,
-                imageUrl: nil,
+                imageURL: nil,
                 imageFrontUrl: nil,
                 code: nil
             )

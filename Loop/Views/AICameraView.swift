@@ -294,7 +294,11 @@ struct AICameraView: View {
                     addTelemetryLog("🤖 Running AI vision analysis...")
                 }
                 
-                let result = try await aiService.analyzeFoodImage(image)
+                let result = try await aiService.analyzeFoodImage(image) { telemetryMessage in
+                    Task { @MainActor in
+                        addTelemetryLog(telemetryMessage)
+                    }
+                }
                 
                 // Step 5: Results processing
                 await MainActor.run {

@@ -383,8 +383,8 @@ extension SettingsView {
             LargeButton(action: { sheet = .aiSettings },
                         includeArrow: true,
                         imageView: Image(systemName: "sparkles").renderingMode(.template).foregroundColor(.purple),
-                        label: "AI Food Analysis",
-                        descriptiveText: "Configure AI Providers")
+                        label: "Food Search",
+                        descriptiveText: "Enable/Configure Food Search & AI Services")
         }
     }
     

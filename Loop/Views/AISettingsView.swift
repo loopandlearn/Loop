@@ -46,6 +46,9 @@ struct AISettingsView: View {
     @State private var showOpenAIKey: Bool = false
     @State private var showGoogleGeminiKey: Bool = false
     
+    // Feature flag for Food Search
+    @State private var foodSearchEnabled: Bool = UserDefaults.standard.foodSearchEnabled
+    
     init() {
         _claudeKey = State(initialValue: ConfigurableAIService.shared.getAPIKey(for: .claude) ?? "")
         _claudeQuery = State(initialValue: ConfigurableAIService.shared.getQuery(for: .claude) ?? "")
@@ -58,7 +61,15 @@ struct AISettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Food Search Provider Configuration"), 
+                // Feature Toggle Section
+                Section(header: Text("Food Search Feature"), 
+                       footer: Text("Enable this to show Food Search functionality in the carb entry screen. When disabled, the feature is hidden but all your settings are preserved.")) {
+                    Toggle("Enable Food Search", isOn: $foodSearchEnabled)
+                }
+                
+                // Only show configuration sections if feature is enabled
+                if foodSearchEnabled {
+                    Section(header: Text("Food Search Provider Configuration"), 
                        footer: Text("Configure the API service used for each type of food search. AI Image Analysis controls what happens when you take photos of food. Different providers excel at different search methods.")) {
                     
                     ForEach(SearchType.allCases, id: \.self) { searchType in
@@ -344,6 +355,7 @@ struct AISettingsView: View {
                         }
                     }
                 }
+                } // End if foodSearchEnabled
                 
                 Section(header: Text("Medical Disclaimer")) {
                     Text("AI nutritional estimates are approximations only. Always consult with your healthcare provider for medical decisions. Verify nutritional information whenever possible. Use at your own risk.")
@@ -362,6 +374,7 @@ struct AISettingsView: View {
                     openAIQuery = ConfigurableAIService.shared.getQuery(for: .openAI) ?? ""
                     googleGeminiKey = ConfigurableAIService.shared.getAPIKey(for: .googleGemini) ?? ""
                     googleGeminiQuery = ConfigurableAIService.shared.getQuery(for: .googleGemini) ?? ""
+                    foodSearchEnabled = UserDefaults.standard.foodSearchEnabled  // Restore original feature flag state
                     
                     presentationMode.wrappedValue.dismiss()
                 }
@@ -455,6 +468,9 @@ struct AISettingsView: View {
     
     private func saveSettings() {
         // Save all current settings to UserDefaults
+        // Feature flag setting
+        UserDefaults.standard.foodSearchEnabled = foodSearchEnabled
+        
         // API key and query settings
         aiService.setAPIKey(claudeKey, for: .claude)
         aiService.setAPIKey(openAIKey, for: .openAI)

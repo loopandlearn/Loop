@@ -62,7 +62,7 @@ struct OpenFoodFactsProduct: Codable, Identifiable, Hashable {
     let nutriments: Nutriments
     let servingSize: String?
     let servingQuantity: Double?
-    let imageUrl: String?
+    let imageURL: String?
     let imageFrontUrl: String?
     let code: String? // barcode
     var dataSource: FoodDataSource = .unknown
@@ -77,7 +77,7 @@ struct OpenFoodFactsProduct: Codable, Identifiable, Hashable {
         case nutriments
         case servingSize = "serving_size"
         case servingQuantity = "serving_quantity"
-        case imageUrl = "image_url"
+        case imageURL = "image_url"
         case imageFrontUrl = "image_front_url"
         case code
         case dataSource = "data_source"
@@ -115,7 +115,7 @@ struct OpenFoodFactsProduct: Codable, Identifiable, Hashable {
         } else {
             self.servingQuantity = nil
         }
-        self.imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+        self.imageURL = try container.decodeIfPresent(String.self, forKey: .imageURL)
         self.imageFrontUrl = try container.decodeIfPresent(String.self, forKey: .imageFrontUrl)
         // dataSource has a default value, but override if present in decoded data
         if let decodedDataSource = try? container.decode(FoodDataSource.self, forKey: .dataSource) {
@@ -132,7 +132,7 @@ struct OpenFoodFactsProduct: Codable, Identifiable, Hashable {
         try container.encode(nutriments, forKey: .nutriments)
         try container.encodeIfPresent(servingSize, forKey: .servingSize)
         try container.encodeIfPresent(servingQuantity, forKey: .servingQuantity)
-        try container.encodeIfPresent(imageUrl, forKey: .imageUrl)
+        try container.encodeIfPresent(imageURL, forKey: .imageURL)
         try container.encodeIfPresent(imageFrontUrl, forKey: .imageFrontUrl)
         try container.encodeIfPresent(code, forKey: .code)
         try container.encode(dataSource, forKey: .dataSource)
@@ -142,7 +142,7 @@ struct OpenFoodFactsProduct: Codable, Identifiable, Hashable {
     // MARK: - Custom Initializers
     
     /// Create a skeleton product for loading states
-    init(id: String, productName: String?, brands: String?, categories: String? = nil, nutriments: Nutriments, servingSize: String?, servingQuantity: Double?, imageUrl: String?, imageFrontUrl: String?, code: String?, dataSource: FoodDataSource = .unknown, isSkeleton: Bool = false) {
+    init(id: String, productName: String?, brands: String?, categories: String? = nil, nutriments: Nutriments, servingSize: String?, servingQuantity: Double?, imageURL: String?, imageFrontUrl: String?, code: String?, dataSource: FoodDataSource = .unknown, isSkeleton: Bool = false) {
         self.id = id
         self.productName = productName
         self.brands = brands
@@ -150,7 +150,7 @@ struct OpenFoodFactsProduct: Codable, Identifiable, Hashable {
         self.nutriments = nutriments
         self.servingSize = servingSize
         self.servingQuantity = servingQuantity
-        self.imageUrl = imageUrl
+        self.imageURL = imageURL
         self.imageFrontUrl = imageFrontUrl
         self.code = code
         self.dataSource = dataSource
@@ -382,7 +382,7 @@ extension OpenFoodFactsProduct {
             nutriments: Nutriments.sample(carbs: carbs),
             servingSize: servingSize,
             servingQuantity: 100.0,
-            imageUrl: nil,
+            imageURL: nil,
             imageFrontUrl: nil,
             code: "1234567890123"
         )
@@ -405,7 +405,7 @@ extension Nutriments {
 }
 
 extension OpenFoodFactsProduct {
-    init(id: String, productName: String?, brands: String?, categories: String?, nutriments: Nutriments, servingSize: String?, servingQuantity: Double?, imageUrl: String?, imageFrontUrl: String?, code: String?) {
+    init(id: String, productName: String?, brands: String?, categories: String?, nutriments: Nutriments, servingSize: String?, servingQuantity: Double?, imageURL: String?, imageFrontUrl: String?, code: String?) {
         self.id = id
         self.productName = productName
         self.brands = brands
@@ -413,7 +413,7 @@ extension OpenFoodFactsProduct {
         self.nutriments = nutriments
         self.servingSize = servingSize
         self.servingQuantity = servingQuantity
-        self.imageUrl = imageUrl
+        self.imageURL = imageURL
         self.imageFrontUrl = imageFrontUrl
         self.code = code
     }
