@@ -423,6 +423,7 @@ final class CarbEntryViewModel: ObservableObject {
                 print("⏰ New absorption time: \(newAbsorptionTime)")
                 print("⏰ absorptionEditIsProgrammatic: \(self?.absorptionEditIsProgrammatic ?? false)")
                 print("⏰ Current absorptionTimeWasEdited: \(self?.absorptionTimeWasEdited ?? false)")
+                print("⏰ Current absorptionTimeWasAIGenerated: \(self?.absorptionTimeWasAIGenerated ?? false)")
                 
                 if self?.absorptionEditIsProgrammatic == true {
                     print("⏰ Programmatic change detected - not marking as edited")
@@ -434,6 +435,7 @@ final class CarbEntryViewModel: ObservableObject {
                     self?.absorptionTimeWasAIGenerated = false  // Clear AI flag when user manually changes
                 }
                 print("⏰ Final absorptionTimeWasEdited: \(self?.absorptionTimeWasEdited ?? false)")
+                print("⏰ Final absorptionTimeWasAIGenerated: \(self?.absorptionTimeWasAIGenerated ?? false)")
                 print("⏰ ========== ABSORPTION TIME OBSERVER COMPLETE ==========")
             }
             .store(in: &cancellables)

@@ -406,6 +406,9 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             CardSectionDivider()
             
             AbsorptionTimePickerRow(absorptionTime: $viewModel.absorptionTime, isFocused: absorptionTimeFocused, validDurationRange: viewModel.absorptionRimesRange, isAIGenerated: viewModel.absorptionTimeWasAIGenerated, showHowAbsorptionTimeWorks: $showHowAbsorptionTimeWorks)
+                .onReceive(viewModel.$absorptionTimeWasAIGenerated) { isAIGenerated in
+                    print("🎯 AbsorptionTimePickerRow received isAIGenerated: \(isAIGenerated)")
+                }
                 .padding(.bottom, 2)
         }
         .padding(.vertical, 12)
@@ -445,13 +448,30 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
         viewModel.numberOfServings = result.servings
         
         // Set dynamic absorption time if advanced dosing is enabled
+        print("🤖 AI ABSORPTION TIME DEBUG:")
+        print("🤖 Advanced Dosing Enabled: \(UserDefaults.standard.advancedDosingRecommendationsEnabled)")
+        print("🤖 AI Absorption Hours: \(result.absorptionTimeHours ?? 0)")
+        print("🤖 Current Absorption Time: \(viewModel.absorptionTime)")
+        
         if UserDefaults.standard.advancedDosingRecommendationsEnabled,
            let absorptionHours = result.absorptionTimeHours,
            absorptionHours > 0 {
             let absorptionTimeInterval = TimeInterval(absorptionHours * 3600) // Convert hours to seconds
+            
+            print("🤖 Setting AI absorption time: \(absorptionHours) hours = \(absorptionTimeInterval) seconds")
+            
+            // Use programmatic flag to prevent observer from clearing AI flag
+            viewModel.absorptionEditIsProgrammatic = true
             viewModel.absorptionTime = absorptionTimeInterval
-            viewModel.absorptionTimeWasEdited = true // Mark as edited to preserve the AI-suggested time
-            viewModel.absorptionTimeWasAIGenerated = true // Mark as AI-generated for visual indication
+            
+            // Set AI flag after a brief delay to ensure observer has completed
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                viewModel.absorptionTimeWasAIGenerated = true // Mark as AI-generated for visual indication
+                print("🤖 AI absorption time flag set. Flag: \(viewModel.absorptionTimeWasAIGenerated)")
+            }
+            
+        } else {
+            print("🤖 AI absorption time conditions not met - not setting absorption time")
         }
     }
     
