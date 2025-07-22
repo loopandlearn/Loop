@@ -780,16 +780,16 @@ enum ImageAnalysisType: String {
 /// Result from AI food analysis with detailed breakdown
 struct AIFoodAnalysisResult {
     let imageType: ImageAnalysisType?
-    let foodItemsDetailed: [FoodItemAnalysis]
+    var foodItemsDetailed: [FoodItemAnalysis]
     let overallDescription: String?
     let confidence: AIConfidenceLevel
     let totalFoodPortions: Int?
     let totalUsdaServings: Double?
-    let totalCarbohydrates: Double
-    let totalProtein: Double?
-    let totalFat: Double?
-    let totalFiber: Double?
-    let totalCalories: Double?
+    var totalCarbohydrates: Double
+    var totalProtein: Double?
+    var totalFat: Double?
+    var totalFiber: Double?
+    var totalCalories: Double?
     let portionAssessmentMethod: String?
     let diabetesConsiderations: String?
     let visualAssessmentDetails: String?
@@ -801,8 +801,8 @@ struct AIFoodAnalysisResult {
     let insulinTimingRecommendations: String?
     let fpuDosingGuidance: String?
     let exerciseConsiderations: String?
-    let absorptionTimeHours: Double?
-    let absorptionTimeReasoning: String?
+    var absorptionTimeHours: Double?
+    var absorptionTimeReasoning: String?
     let mealSizeImpact: String?
     let individualizationFactors: String?
     let safetyAlerts: String?

@@ -1651,5 +1651,139 @@ extension CarbEntryViewModel {
         
         return image
     }
+    
+    // MARK: - Food Item Management
+    
+    func deleteFoodItem(at index: Int) {
+        guard var currentResult = lastAIAnalysisResult,
+              index >= 0 && index < currentResult.foodItemsDetailed.count else {
+            print("⚠️ Cannot delete food item: invalid index \(index) or no AI analysis result")
+            return
+        }
+        
+        print("🗑️ Deleting food item at index \(index): \(currentResult.foodItemsDetailed[index].name)")
+        
+        // Remove the item from the array (now possible since foodItemsDetailed is var)
+        currentResult.foodItemsDetailed.remove(at: index)
+        
+        // Recalculate totals from remaining items
+        let newTotalCarbs = currentResult.foodItemsDetailed.reduce(0) { $0 + $1.carbohydrates }
+        let newTotalProtein = currentResult.foodItemsDetailed.compactMap { $0.protein }.reduce(0, +)
+        let newTotalFat = currentResult.foodItemsDetailed.compactMap { $0.fat }.reduce(0, +)
+        let newTotalFiber = currentResult.foodItemsDetailed.compactMap { $0.fiber }.reduce(0, +)
+        let newTotalCalories = currentResult.foodItemsDetailed.compactMap { $0.calories }.reduce(0, +)
+        
+        // Update the totals in the current result
+        currentResult.totalCarbohydrates = newTotalCarbs
+        currentResult.totalProtein = newTotalProtein > 0 ? newTotalProtein : nil
+        currentResult.totalFat = newTotalFat > 0 ? newTotalFat : nil
+        currentResult.totalFiber = newTotalFiber > 0 ? newTotalFiber : nil
+        currentResult.totalCalories = newTotalCalories > 0 ? newTotalCalories : nil
+        
+        // Recalculate absorption time if advanced dosing is enabled
+        if UserDefaults.standard.advancedDosingRecommendationsEnabled {
+            let (newAbsorptionHours, newReasoning) = recalculateAbsorptionTime(
+                carbs: newTotalCarbs,
+                protein: newTotalProtein,
+                fat: newTotalFat,
+                fiber: newTotalFiber,
+                calories: newTotalCalories,
+                remainingItems: currentResult.foodItemsDetailed
+            )
+            
+            currentResult.absorptionTimeHours = newAbsorptionHours
+            currentResult.absorptionTimeReasoning = newReasoning
+            
+            // Update the UI absorption time if it was previously AI-generated
+            if absorptionTimeWasAIGenerated {
+                let newAbsorptionTimeInterval = TimeInterval(newAbsorptionHours * 3600)
+                absorptionEditIsProgrammatic = true
+                absorptionTime = newAbsorptionTimeInterval
+                
+                print("🤖 Updated AI absorption time after deletion: \(newAbsorptionHours) hours")
+            }
+        }
+        
+        // Update the stored result and carb quantity
+        lastAIAnalysisResult = currentResult
+        carbsQuantity = newTotalCarbs
+        
+        print("✅ Food item deleted. New total carbs: \(newTotalCarbs)g")
+    }
+    
+    // MARK: - Absorption Time Recalculation
+    
+    /// Recalculates absorption time based on remaining meal composition using AI dosing logic
+    private func recalculateAbsorptionTime(
+        carbs: Double,
+        protein: Double,
+        fat: Double,
+        fiber: Double,
+        calories: Double,
+        remainingItems: [FoodItemAnalysis]
+    ) -> (hours: Double, reasoning: String) {
+        
+        // Base absorption time based on carb complexity
+        let baselineHours: Double = carbs <= 15 ? 2.5 : 3.0
+        
+        // Calculate Fat/Protein Units (FPUs)
+        let fpuValue = (fat + protein) / 10.0
+        let fpuAdjustment: Double
+        let fpuDescription: String
+        
+        if fpuValue < 2.0 {
+            fpuAdjustment = 1.0
+            fpuDescription = "Low FPU (\(String(format: "%.1f", fpuValue))) - minimal extension"
+        } else if fpuValue < 4.0 {
+            fpuAdjustment = 2.5
+            fpuDescription = "Medium FPU (\(String(format: "%.1f", fpuValue))) - moderate extension"
+        } else {
+            fpuAdjustment = 4.0
+            fpuDescription = "High FPU (\(String(format: "%.1f", fpuValue))) - significant extension"
+        }
+        
+        // Fiber impact on absorption
+        let fiberAdjustment: Double
+        let fiberDescription: String
+        
+        if fiber > 8.0 {
+            fiberAdjustment = 2.0
+            fiberDescription = "High fiber (\(String(format: "%.1f", fiber))g) - significantly slows absorption"
+        } else if fiber > 5.0 {
+            fiberAdjustment = 1.0
+            fiberDescription = "Moderate fiber (\(String(format: "%.1f", fiber))g) - moderately slows absorption"
+        } else {
+            fiberAdjustment = 0.0
+            fiberDescription = "Low fiber (\(String(format: "%.1f", fiber))g) - minimal impact"
+        }
+        
+        // Meal size impact
+        let mealSizeAdjustment: Double
+        let mealSizeDescription: String
+        
+        if calories > 800 {
+            mealSizeAdjustment = 2.0
+            mealSizeDescription = "Large meal (\(String(format: "%.0f", calories)) cal) - delayed gastric emptying"
+        } else if calories > 400 {
+            mealSizeAdjustment = 1.0
+            mealSizeDescription = "Medium meal (\(String(format: "%.0f", calories)) cal) - moderate impact"
+        } else {
+            mealSizeAdjustment = 0.0
+            mealSizeDescription = "Small meal (\(String(format: "%.0f", calories)) cal) - minimal impact"
+        }
+        
+        // Calculate total absorption time (capped at reasonable limits)
+        let totalHours = min(max(baselineHours + fpuAdjustment + fiberAdjustment + mealSizeAdjustment, 2.0), 8.0)
+        
+        // Generate detailed reasoning
+        let reasoning = "RECALCULATED after food deletion: " +
+                       "BASELINE: \(String(format: "%.1f", baselineHours)) hours for \(String(format: "%.1f", carbs))g carbs. " +
+                       "FPU IMPACT: \(fpuDescription) (+\(String(format: "%.1f", fpuAdjustment)) hours). " +
+                       "FIBER EFFECT: \(fiberDescription) (+\(String(format: "%.1f", fiberAdjustment)) hours). " +
+                       "MEAL SIZE: \(mealSizeDescription) (+\(String(format: "%.1f", mealSizeAdjustment)) hours). " +
+                       "TOTAL: \(String(format: "%.1f", totalHours)) hours for remaining meal composition."
+        
+        return (totalHours, reasoning)
+    }
 }
 

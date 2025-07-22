@@ -289,9 +289,17 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                         HStack(alignment: .center) {
                             Spacer()
                             HStack(alignment: .center, spacing: 12) {
+                                // Use AI analysis result if available, otherwise fall back to selected food
+                                let aiResult = viewModel.lastAIAnalysisResult
+                                let carbsValue = aiResult?.totalCarbohydrates ?? ((selectedFood.carbsPerServing ?? selectedFood.nutriments.carbohydrates) * viewModel.numberOfServings)
+                                let caloriesValue = aiResult?.totalCalories ?? (selectedFood.caloriesPerServing.map { $0 * viewModel.numberOfServings })
+                                let fatValue = aiResult?.totalFat ?? (selectedFood.fatPerServing.map { $0 * viewModel.numberOfServings })
+                                let fiberValue = aiResult?.totalFiber ?? (selectedFood.fiberPerServing.map { $0 * viewModel.numberOfServings })
+                                let proteinValue = aiResult?.totalProtein ?? (selectedFood.proteinPerServing.map { $0 * viewModel.numberOfServings })
+                                
                                 // Carbohydrates (first)
                                 NutritionCircle(
-                                    value: (selectedFood.carbsPerServing ?? selectedFood.nutriments.carbohydrates) * viewModel.numberOfServings,
+                                    value: carbsValue,
                                     unit: "g",
                                     label: "Carbs",
                                     color: Color(red: 0.4, green: 0.7, blue: 1.0), // Light blue
@@ -299,9 +307,9 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                                 )
                                 
                                 // Calories (second)
-                                if let calories = selectedFood.caloriesPerServing {
+                                if let calories = caloriesValue, calories > 0 {
                                     NutritionCircle(
-                                        value: calories * viewModel.numberOfServings,
+                                        value: calories,
                                         unit: "cal",
                                         label: "Calories",
                                         color: Color(red: 0.5, green: 0.8, blue: 0.4), // Green
@@ -310,9 +318,9 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                                 }
                                 
                                 // Fat (third)
-                                if let fat = selectedFood.fatPerServing {
+                                if let fat = fatValue, fat > 0 {
                                     NutritionCircle(
-                                        value: fat * viewModel.numberOfServings,
+                                        value: fat,
                                         unit: "g",
                                         label: "Fat", 
                                         color: Color(red: 1.0, green: 0.8, blue: 0.2), // Golden yellow
@@ -321,9 +329,9 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                                 }
                                 
                                 // Fiber (fourth)
-                                if let fiber = selectedFood.fiberPerServing {
+                                if let fiber = fiberValue, fiber > 0 {
                                     NutritionCircle(
-                                        value: fiber * viewModel.numberOfServings,
+                                        value: fiber,
                                         unit: "g", 
                                         label: "Fiber",
                                         color: Color(red: 0.6, green: 0.4, blue: 0.8), // Purple
@@ -332,9 +340,9 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                                 }
                                 
                                 // Protein (fifth)
-                                if let protein = selectedFood.proteinPerServing {
+                                if let protein = proteinValue, protein > 0 {
                                     NutritionCircle(
-                                        value: protein * viewModel.numberOfServings,
+                                        value: protein,
                                         unit: "g", 
                                         label: "Protein",
                                         color: Color(red: 1.0, green: 0.4, blue: 0.4), // Coral/red
@@ -996,7 +1004,13 @@ extension CarbEntryView {
             if expandedRow == .detailedFoodBreakdown {
                 VStack(spacing: 12) {
                     ForEach(Array(aiResult.foodItemsDetailed.enumerated()), id: \.offset) { index, foodItem in
-                        FoodItemDetailRow(foodItem: foodItem, itemNumber: index + 1)
+                        FoodItemDetailRow(
+                            foodItem: foodItem, 
+                            itemNumber: index + 1,
+                            onDelete: {
+                                viewModel.deleteFoodItem(at: index)
+                            }
+                        )
                     }
                 }
                 .padding(.horizontal, 8)
@@ -1343,6 +1357,13 @@ struct QuickSearchSuggestions: View {
 struct FoodItemDetailRow: View {
     let foodItem: FoodItemAnalysis
     let itemNumber: Int
+    let onDelete: (() -> Void)?
+    
+    init(foodItem: FoodItemAnalysis, itemNumber: Int, onDelete: (() -> Void)? = nil) {
+        self.foodItem = foodItem
+        self.itemNumber = itemNumber
+        self.onDelete = onDelete
+    }
     
     var body: some View {
         VStack(spacing: 8) {
@@ -1377,6 +1398,17 @@ struct FoodItemDetailRow: View {
                 .padding(.vertical, 4)
                 .background(Color(.systemBlue).opacity(0.1))
                 .cornerRadius(8)
+                
+                // Delete button (if callback provided) - positioned after carbs
+                if let onDelete = onDelete {
+                    Button(action: onDelete) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.leading, 8)
+                }
             }
             
             // Portion details
