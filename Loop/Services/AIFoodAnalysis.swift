@@ -672,6 +672,9 @@ struct AIFoodAnalysisResult {
     let visualAssessmentDetails: String?
     let notes: String?
     
+    // Store original baseline servings for proper scaling calculations
+    let originalServings: Double
+    
     // Advanced dosing fields (optional for backward compatibility)
     let fatProteinUnits: String?
     let netCarbsAdjustment: String?
@@ -1960,6 +1963,9 @@ class OpenAIFoodAnalysisService {
             print("🔍 Extracted absorptionTimeHours: \(absorptionHours?.description ?? "nil")")
             print("🔍 ========== OPENAI AI ANALYSIS RESULT CREATION COMPLETE ==========")
             
+            // Calculate original servings for proper scaling
+            let originalServings = detailedFoodItems.reduce(0) { $0 + $1.servingMultiplier }
+            
             return AIFoodAnalysisResult(
                 imageType: imageType,
                 foodItemsDetailed: detailedFoodItems,
@@ -1976,6 +1982,7 @@ class OpenAIFoodAnalysisService {
                 diabetesConsiderations: diabetesConsiderations,
                 visualAssessmentDetails: visualAssessmentDetails,
                 notes: "Analyzed using OpenAI GPT-4 Vision with detailed portion assessment",
+                originalServings: originalServings,
                 fatProteinUnits: extractString(from: nutritionData, keys: ["fat_protein_units"]),
                 netCarbsAdjustment: extractString(from: nutritionData, keys: ["net_carbs_adjustment"]),
                 insulinTimingRecommendations: extractString(from: nutritionData, keys: ["insulin_timing_recommendations"]),
@@ -2708,6 +2715,9 @@ class GoogleGeminiFoodAnalysisService {
             print("🔍 Extracted absorptionTimeHours: \(absorptionHours?.description ?? "nil")")
             print("🔍 ========== GEMINI AI ANALYSIS RESULT CREATION COMPLETE ==========")
             
+            // Calculate original servings for proper scaling
+            let originalServings = detailedFoodItems.reduce(0) { $0 + $1.servingMultiplier }
+            
             return AIFoodAnalysisResult(
                 imageType: imageType,
                 foodItemsDetailed: detailedFoodItems,
@@ -2724,6 +2734,7 @@ class GoogleGeminiFoodAnalysisService {
                 diabetesConsiderations: diabetesConsiderations,
                 visualAssessmentDetails: visualAssessmentDetails,
                 notes: "Analyzed using Google Gemini Vision - AI food recognition with enhanced safety measures",
+                originalServings: originalServings,
                 fatProteinUnits: extractString(from: nutritionData, keys: ["fat_protein_units"]),
                 netCarbsAdjustment: extractString(from: nutritionData, keys: ["net_carbs_adjustment"]),
                 insulinTimingRecommendations: extractString(from: nutritionData, keys: ["insulin_timing_recommendations"]),
@@ -2862,6 +2873,9 @@ class BasicFoodAnalysisService {
         let totalFiber = foodItems.compactMap { $0.fiber }.reduce(0, +)
         let totalCalories = foodItems.compactMap { $0.calories }.reduce(0, +)
         
+        // Calculate original servings for proper scaling
+        let originalServings = foodItems.reduce(0) { $0 + $1.servingMultiplier }
+        
         return AIFoodAnalysisResult(
             imageType: .foodPhoto, // Fallback analysis assumes food photo
             foodItemsDetailed: foodItems,
@@ -2878,6 +2892,7 @@ class BasicFoodAnalysisService {
             diabetesConsiderations: "Basic carbohydrate estimate provided. Monitor blood glucose response and adjust insulin as needed.",
             visualAssessmentDetails: nil,
             notes: "This is a basic analysis. For more detailed and accurate nutrition information, consider configuring an AI provider in Settings.",
+            originalServings: originalServings,
             fatProteinUnits: nil,
             netCarbsAdjustment: nil,
             insulinTimingRecommendations: nil,
@@ -3337,6 +3352,9 @@ class ClaudeFoodAnalysisService {
         let imageTypeString = json["image_type"] as? String
         let imageType = ImageAnalysisType(rawValue: imageTypeString ?? "food_photo") ?? .foodPhoto
         
+        // Calculate original servings for proper scaling
+        let originalServings = foodItems.reduce(0) { $0 + $1.servingMultiplier }
+        
         return AIFoodAnalysisResult(
             imageType: imageType,
             foodItemsDetailed: foodItems,
@@ -3353,6 +3371,7 @@ class ClaudeFoodAnalysisService {
             diabetesConsiderations: json["diabetes_considerations"] as? String,
             visualAssessmentDetails: json["visual_assessment_details"] as? String,
             notes: "Analysis provided by Claude (Anthropic)",
+            originalServings: originalServings,
             fatProteinUnits: json["fat_protein_units"] as? String,
             netCarbsAdjustment: json["net_carbs_adjustment"] as? String,
             insulinTimingRecommendations: json["insulin_timing_recommendations"] as? String,

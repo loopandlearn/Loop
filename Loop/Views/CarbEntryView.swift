@@ -305,8 +305,9 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                                 
                                 let (carbsValue, caloriesValue, fatValue, fiberValue, proteinValue): (Double, Double?, Double?, Double?, Double?) = {
                                     if let aiResult = aiResult {
-                                        // For AI results: scale by current servings vs AI's baseline servings
-                                        let servingScale = viewModel.numberOfServings / aiResult.servings
+                                        // For AI results: scale by current servings vs original baseline servings
+                                        // This ensures both food deletion and serving adjustments work correctly
+                                        let servingScale = viewModel.numberOfServings / aiResult.originalServings
                                         return (
                                             aiResult.totalCarbohydrates * servingScale,
                                             aiResult.totalCalories.map { $0 * servingScale },
@@ -833,7 +834,7 @@ extension CarbEntryView {
                 // Expandable header for Advanced Analysis
                 HStack {
                     Image(systemName: "brain.head.profile")
-                        .foregroundColor(.indigo)
+                        .foregroundColor(.purple)
                         .font(.system(size: 16, weight: .medium))
                     
                     Text("Advanced Analysis")
@@ -1587,7 +1588,7 @@ struct AIAbsorptionTimePickerRow: View {
                     HStack(spacing: 4) {
                         Image(systemName: "brain.head.profile")
                             .font(.caption)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.purple)
                         Text("AI")
                             .font(.caption)
                             .fontWeight(.medium)
@@ -1659,7 +1660,7 @@ struct FoodSearchEnableRow: View {
                 HStack(spacing: 8) {
                     Image(systemName: "brain.head.profile")
                         .font(.title3)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.purple)
                         .scaleEffect(isAnimating ? 1.1 : 1.0)
                         .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isAnimating)
                     

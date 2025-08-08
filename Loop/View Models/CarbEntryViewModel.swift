@@ -1609,6 +1609,7 @@ extension CarbEntryViewModel {
             diabetesConsiderations: "Values estimated from food name - verify portion size for accurate insulin dosing",
             visualAssessmentDetails: nil,
             notes: "Google Gemini nutrition analysis from text query",
+            originalServings: 1.0,
             fatProteinUnits: nil,
             netCarbsAdjustment: nil,
             insulinTimingRecommendations: nil,
