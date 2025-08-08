@@ -26,6 +26,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
     @State private var showAddFavoriteFood = false
     @State private var showingAICamera = false
     @State private var showingAISettings = false
+    @State private var isFoodSearchEnabled = UserDefaults.standard.foodSearchEnabled
     
     // MARK: - Row enum
     enum Row: Hashable {
@@ -127,6 +128,16 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
         .sheet(isPresented: $showingAISettings) {
             AISettingsView()
         }
+        .onAppear {
+            isFoodSearchEnabled = UserDefaults.standard.foodSearchEnabled
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            // Update state when UserDefaults changes (e.g., from Settings screen)
+            let currentSetting = UserDefaults.standard.foodSearchEnabled
+            if currentSetting != isFoodSearchEnabled {
+                isFoodSearchEnabled = currentSetting
+            }
+        }
     }
     
     private var mainCard: some View {
@@ -139,7 +150,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             CarbQuantityRow(quantity: $viewModel.carbsQuantity, isFocused: amountConsumedFocused, title: NSLocalizedString("Amount Consumed", comment: "Label for carb quantity entry row on carb entry screen"), preferredCarbUnit: viewModel.preferredCarbUnit)
             
             // Food search section - moved up from bottom
-            if isNewEntry && UserDefaults.standard.foodSearchEnabled {
+            if isNewEntry && isFoodSearchEnabled {
                 CardSectionDivider()
                 
                 VStack(spacing: 16) {
@@ -206,7 +217,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             }
             
             // Food-related rows (only show if food search is enabled)
-            if UserDefaults.standard.foodSearchEnabled {
+            if isFoodSearchEnabled {
                 // Always show servings row when food search is enabled
                 ServingsDisplayRow(
                     servings: $viewModel.numberOfServings, 
@@ -436,6 +447,14 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                     print("🎯 AIAbsorptionTimePickerRow received isAIGenerated: \(isAIGenerated)")
                 }
                 .padding(.bottom, 2)
+            
+            // Food Search enablement toggle (only show when Food Search is disabled)
+            if !isFoodSearchEnabled {
+                CardSectionDivider()
+                
+                FoodSearchEnableRow(isFoodSearchEnabled: $isFoodSearchEnabled)
+                    .padding(.bottom, 2)
+            }
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 12)
@@ -1626,5 +1645,48 @@ struct AIAbsorptionTimePickerRow: View {
     
     private func durationString() -> String {
         return durationFormatter.string(from: absorptionTime) ?? ""
+    }
+}
+
+// MARK: - Food Search Enable Row
+struct FoodSearchEnableRow: View {
+    @Binding var isFoodSearchEnabled: Bool
+    @State private var isAnimating = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                        .scaleEffect(isAnimating ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isAnimating)
+                    
+                    Text("Enable Food Search")
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                }
+                
+                Spacer()
+                
+                Toggle("", isOn: $isFoodSearchEnabled)
+                    .labelsHidden()
+                    .scaleEffect(0.8)
+                    .onChange(of: isFoodSearchEnabled) { newValue in
+                        UserDefaults.standard.foodSearchEnabled = newValue
+                    }
+            }
+            
+            Text("Add AI-powered nutrition analysis")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.top, 2)
+                .padding(.leading, 32) // Align with text above
+        }
+        .onAppear {
+            isAnimating = true
+        }
     }
 }
