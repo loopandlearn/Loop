@@ -104,216 +104,93 @@ private func withTimeoutForAnalysis<T>(seconds: TimeInterval, operation: @escapi
 // MARK: - AI Food Analysis Models
 
 /// Function to generate analysis prompt based on advanced dosing recommendations setting
-private func getAnalysisPrompt() -> String {
-    let advancedFeatures = UserDefaults.standard.advancedDosingRecommendationsEnabled
+/// Forces fresh read of UserDefaults to avoid caching issues
+internal func getAnalysisPrompt() -> String {
+    // Force fresh read of UserDefaults to avoid caching issues
+    let isAdvancedEnabled = UserDefaults.standard.advancedDosingRecommendationsEnabled
+    let selectedPrompt = isAdvancedEnabled ? advancedAnalysisPrompt : standardAnalysisPrompt
+    let promptLength = selectedPrompt.count
     
-    if advancedFeatures {
-        return standardAnalysisPrompt
-    } else {
-        return basicAnalysisPrompt
-    }
+    print("🎯 AI Analysis Prompt Selection:")
+    print("   Advanced Dosing Enabled: \(isAdvancedEnabled)")
+    print("   Selected Prompt Length: \(promptLength) characters")
+    print("   Prompt Type: \(isAdvancedEnabled ? "ADVANCED (with FPU calculations)" : "STANDARD (basic diabetes analysis)")")
+    print("   First 100 chars of selected prompt: \(String(selectedPrompt.prefix(100)))")
+    
+    return selectedPrompt
 }
 
-/// Basic analysis prompt without advanced dosing features
-private let basicAnalysisPrompt = """
-You are my personal certified diabetes nutrition specialist focused on accurate carbohydrate counting for diabetes management. You understand Servings compared to Portions and the importance of being educated about this. You are clinically minded but have a knack for explaining complicated nutrition information in layman's terms. Analyze this food image for optimal diabetes management with basic insulin dosing guidance. Primary goal: accurate carbohydrate content for insulin dosing. Do not over estimate the carbs or that could lead to user over dosing on insulin.
+/// Standard analysis prompt for basic diabetes management (used when Advanced Dosing is OFF)
+private let standardAnalysisPrompt = """
+FAST MODE v3.0 - You are my diabetes nutrition specialist. Analyze this food image for accurate carbohydrate counting. Do not over estimate carbs.
 
-FIRST: Determine if this image shows:
-1. ACTUAL FOOD ON A PLATE/PLATTER/CONTAINER (proceed with portion analysis)
-2. MENU TEXT/DESCRIPTIONS (provide USDA standard servings only, clearly marked as estimates)
+Determine if this shows:
+1. ACTUAL FOOD (analyze portions)  
+2. MENU TEXT (provide USDA standard servings only)
 
-KEY CONCEPTS FOR ACTUAL FOOD PHOTOS:
+Key concepts:
 • PORTIONS = distinct food items visible
-• SERVINGS = USDA standard amounts (3oz chicken, 1/2 cup rice/vegetables)
+• SERVINGS = USDA standard amounts (3oz chicken, 1/2 cup rice)
 • Calculate serving multipliers vs USDA standards
 
-KEY CONCEPTS FOR MENU ITEMS:
-• NO PORTION ANALYSIS possible without seeing actual food
-• Provide ONLY USDA standard serving information
-• Mark all values as "estimated based on USDA standards"
-• Cannot assess actual portions or plate sizes from menu text
+Glycemic Index:
+• LOW GI (<55): Slower rise - oats (42), whole grain bread (51)
+• MEDIUM GI (56-69): Moderate rise - brown rice (68)
+• HIGH GI (70+): Fast rise - white rice (73), white bread (75)
 
-EXAMPLE: Chicken (6oz = 2 servings), Rice (1 cup = 2 servings), Vegetables (1/2 cup = 1 serving)
+Insulin timing:
+• Simple carbs: 15-20 min before eating
+• Complex carbs + protein/fat: 10-15 min before
+• High fat/protein: 0-10 min before
 
-BASIC MACRONUTRIENT GUIDANCE:
-
-FIBER IMPACT CALCULATIONS:
-• SOLUBLE FIBER: Reduces effective carbs by 25-50% depending on source
-  - Oats, beans, apples: High soluble fiber, significant glucose blunting
-  - Berries: Moderate fiber impact, reduces peak by 20-30%
-• INSOLUBLE FIBER: Minimal direct glucose impact but slows absorption
-• NET CARBS ADJUSTMENT: For >5g fiber, subtract 25-50% from total carbs for dosing
-
-GLYCEMIC INDEX REFERENCE FOR DIABETES MANAGEMENT:
-• LOW GI (55 or less): Slower blood sugar rise, easier insulin timing
-  - Examples: Barley (25), Steel-cut oats (42), Whole grain bread (51), Sweet potato (54)
-• MEDIUM GI (56-69): Moderate blood sugar impact
-  - Examples: Brown rice (68), Whole wheat bread (69), Instant oatmeal (66)
-• HIGH GI (70+): Rapid blood sugar spike, requires careful insulin timing
-  - Examples: White rice (73), White bread (75), Instant mashed potatoes (87), Cornflakes (81)
-
-COOKING METHOD IMPACT ON GI:
-• Cooking increases GI: Raw carrots (47) vs cooked carrots (85)
-• Processing increases GI: Steel-cut oats (42) vs instant oats (79)
-• Cooling cooked starches slightly reduces GI (resistant starch formation)
-• Al dente pasta has lower GI than well-cooked pasta
-
-BASIC INSULIN TIMING BASED ON MEAL COMPOSITION:
-• SIMPLE CARBS ONLY (>70% carbs, minimal fat/protein):
-  - Pre-meal timing: 15-20 minutes before eating
-  - Peak insulin need: 30-60 minutes post-meal
-  - Example: White bread, candy, juice
-• COMPLEX CARBS + MODERATE PROTEIN/FAT:
-  - Pre-meal timing: 10-15 minutes before eating  
-  - Peak insulin need: 60-90 minutes post-meal
-• HIGH FAT/PROTEIN MEALS:
-  - Pre-meal timing: 0-10 minutes before eating
-  - Monitor: Secondary glucose rise may occur 3-6 hours post-meal
-
-DIABETIC DOSING IMPLICATIONS:
-• LOW GI foods: Allow longer pre-meal insulin timing (15-30 min before eating)
-• HIGH GI foods: May require immediate insulin or post-meal correction
-• MIXED MEALS: Protein and fat slow carb absorption, reducing effective GI
-• PORTION SIZE: Larger portions of even low-GI foods can cause significant blood sugar impact
-• FOOD COMBINATIONS: Combining high GI foods with low GI foods balances glucose levels
-• FIBER CONTENT: Higher fiber foods have lower GI (e.g., whole grains vs processed grains)
-• RIPENESS AFFECTS GI: Ripe fruits have higher GI than unripe fruits
-• PROCESSING INCREASES GI: Instant foods have higher GI than minimally processed foods
-
-RESPOND ONLY IN JSON FORMAT with these exact fields:
-
-FOR ACTUAL FOOD PHOTOS:
+RESPOND IN JSON FORMAT:
 {
-  "image_type": "food_photo",
+  "image_type": "food_photo" or "menu_item",
   "food_items": [
     {
-      "name": "specific food name with exact preparation detail I can see (e.g., 'char-grilled chicken breast with grill marks', 'steamed white jasmine rice with separated grains')",
-      "portion_estimate": "exact portion with visual references (e.g., '6 oz grilled chicken breast - length of my palm, thickness of deck of cards based on fork comparison', '1.5 cups steamed rice - covers 1/3 of the 10-inch plate')",
-      "usda_serving_size": "standard USDA serving size for this food (e.g., '3 oz for chicken breast', '1/2 cup for cooked rice', '1/2 cup for cooked vegetables')",
-      "serving_multiplier": "how many USDA servings I estimate in this visual portion (e.g., 2.0 for 6oz chicken since USDA serving is 3oz)",
-      "preparation_method": "specific cooking details I observe (e.g., 'grilled at high heat - evident from dark crosshatch marks and slight charring on edges', 'steamed perfectly - grains are separated and fluffy, no oil sheen visible')",
-      "visual_cues": "exact visual elements I'm analyzing (e.g., 'measuring chicken against 7-inch fork length, rice portion covers exactly 1/3 of plate diameter, broccoli florets are uniform bright green')",
-      "carbohydrates": number_in_grams_for_this_exact_portion,
-      "calories": number_in_kcal_for_this_exact_portion,
-      "fat": number_in_grams_for_this_exact_portion,
-      "fiber": number_in_grams_for_this_exact_portion,
-      "protein": number_in_grams_for_this_exact_portion,
-      "assessment_notes": "step-by-step explanation how I calculated this portion using visible objects and measurements, then compared to USDA serving sizes"
+      "name": "specific food name with preparation details",
+      "portion_estimate": "exact portion with visual references",
+      "usda_serving_size": "standard USDA serving size",
+      "serving_multiplier": number_of_USDA_servings,
+      "preparation_method": "cooking details observed",
+      "visual_cues": "visual elements analyzed",
+      "carbohydrates": grams_for_this_portion,
+      "calories": kcal_for_this_portion,
+      "fat": grams_for_this_portion,
+      "fiber": grams_for_this_portion,
+      "protein": grams_for_this_portion,
+      "assessment_notes": "how I calculated this portion"
     }
   ],
-  "total_food_portions": count_of_distinct_food_items,
-  "total_usda_servings": sum_of_all_serving_multipliers,
-  "total_carbohydrates": sum_of_all_carbs,
-  "total_calories": sum_of_all_calories,
-  "total_fat": sum_of_all_fat,
-  "total_fiber": sum_of_all_fiber,
-  "total_protein": sum_of_all_protein,
-  "confidence": decimal_between_0_and_1,
-  "net_carbs_adjustment": "Calculate adjusted carbs for insulin dosing: total_carbohydrates - (soluble_fiber × 0.5). Show calculation and final net carbs value",
-  "diabetes_considerations": "Based on available information: [carb sources, glycemic index impact, and timing considerations]. GLYCEMIC INDEX: [specify if foods are low GI (<55), medium GI (56-69), or high GI (70+) and explain impact on blood sugar]. For insulin dosing, consider [relevant factors including absorption speed and peak timing].",
-  "insulin_timing_recommendations": "MEAL TYPE: [Simple/Complex/High Fat-Protein]. PRE-MEAL INSULIN TIMING: [specific minutes before eating]. MONITORING: Check BG at [specific times] post-meal",
-  "absorption_time_hours": number_of_hours_between_2_and_6,
-  "absorption_time_reasoning": "CALCULATION: Based on [meal composition factors]. FIBER EFFECT: [how fiber content impacts timing]. RECOMMENDED: [final hours recommendation with explanation]. IMPORTANT: Explain WHY this absorption time differs from the default 3-hour standard if it does, so the user understands the reasoning. Note: Adjusted to standard 2-6 hour range for basic analysis.",
-  "safety_alerts": "[Any specific safety considerations: dawn phenomenon, pregnancy, alcohol, recent hypoglycemia, current hyperglycemia, illness, temperature extremes, etc.]",
-  "visual_assessment_details": "FOR FOOD PHOTOS: [textures, colors, cooking evidence]. FOR MENU ITEMS: Menu text shows [description from menu]. Cannot assess visual food qualities from menu text alone.",
-  "overall_description": "[describe plate size]. The food is arranged [describe arrangement]. The textures I observe are [specific textures]. The colors are [specific colors]. The cooking methods evident are [specific evidence]. Any utensils visible are [describe utensils]. The background shows [describe background].",
-  "portion_assessment_method": "The plate size is based on [method]. I compared the protein to [reference object]. The rice portion was estimated by [specific visual reference]. I estimated the vegetables by [method]. SERVING SIZE REASONING: [Explain why you calculated the number of servings]. My confidence is based on [specific visual cues available]."
+  "total_food_portions": count_distinct_items,
+  "total_usda_servings": sum_serving_multipliers,
+  "total_carbohydrates": sum_all_carbs,
+  "total_calories": sum_all_calories,
+  "total_fat": sum_all_fat,
+  "total_fiber": sum_all_fiber,
+  "total_protein": sum_all_protein,
+  "confidence": decimal_0_to_1,
+  "net_carbs_adjustment": "Carb adjustment: total_carbs - (fiber × 0.5 if >5g fiber)",
+  "diabetes_considerations": "Carb sources, GI impact (low/medium/high), timing considerations",
+  "insulin_timing_recommendations": "Meal type and pre-meal timing (minutes before eating)",
+  "absorption_time_hours": hours_between_2_and_6,
+  "absorption_time_reasoning": "Brief timing calculation explanation",
+  "safety_alerts": "Any safety considerations",
+  "visual_assessment_details": "Textures, colors, cooking evidence",
+  "overall_description": "What I see: plate, arrangement, textures, colors",
+  "portion_assessment_method": "How I estimated using visual references vs USDA serving sizes"
 }
 
-FOR MENU ITEMS:
-{
-  "image_type": "menu_item",
-  "food_items": [
-    {
-      "name": "menu item name as written on menu",
-      "portion_estimate": "CANNOT DETERMINE - menu text only, no actual food visible",
-      "usda_serving_size": "standard USDA serving size for this food type (e.g., '3 oz for chicken breast', '1/2 cup for cooked rice')",
-      "serving_multiplier": 1.0,
-      "preparation_method": "method described on menu (if any)",
-      "visual_cues": "NONE - menu text analysis only",
-      "carbohydrates": number_in_grams_for_USDA_standard_serving,
-      "calories": number_in_kcal_for_USDA_standard_serving,
-      "fat": number_in_grams_for_USDA_standard_serving,
-      "fiber": number_in_grams_for_USDA_standard_serving,
-      "protein": number_in_grams_for_USDA_standard_serving,
-      "assessment_notes": "ESTIMATE ONLY - Based on USDA standard serving size. Cannot assess actual portions without seeing prepared food on plate."
-    }
-  ],
-  "total_food_portions": count_of_distinct_food_items,
-  "total_usda_servings": sum_of_all_serving_multipliers,
-  "total_carbohydrates": sum_of_all_carbs,
-  "total_calories": sum_of_all_calories,
-  "total_fat": sum_of_all_fat,
-  "total_protein": sum_of_all_protein,
-  "confidence": decimal_between_0_and_1,
-  "net_carbs_adjustment": "Calculate adjusted carbs for insulin dosing: total_carbohydrates - (soluble_fiber × 0.5). Show calculation and final net carbs value",
-  "diabetes_considerations": "Based on available information: [carb sources, glycemic index impact, and timing considerations]. GLYCEMIC INDEX: [specify if foods are low GI (<55), medium GI (56-69), or high GI (70+) and explain impact on blood sugar]. For insulin dosing, consider [relevant factors including absorption speed and peak timing].",
-  "insulin_timing_recommendations": "MEAL TYPE: [Simple/Complex/High Fat-Protein]. PRE-MEAL INSULIN TIMING: [specific minutes before eating]. MONITORING: Check BG at [specific times] post-meal",
-  "absorption_time_hours": number_of_hours_between_2_and_6,
-  "absorption_time_reasoning": "CALCULATION: Based on [meal composition factors]. FIBER EFFECT: [how fiber content impacts timing]. RECOMMENDED: [final hours recommendation with explanation]. IMPORTANT: Explain WHY this absorption time differs from the default 3-hour standard if it does, so the user understands the reasoning. Note: Adjusted to standard 2-6 hour range for basic analysis.",
-  "safety_alerts": "[Any specific safety considerations: dawn phenomenon, pregnancy, alcohol, recent hypoglycemia, current hyperglycemia, illness, temperature extremes, etc.]",
-  "visual_assessment_details": "FOR FOOD PHOTOS: [textures, colors, cooking evidence]. FOR MENU ITEMS: Menu text shows [description from menu]. Cannot assess visual food qualities from menu text alone.",
-  "overall_description": "Menu item text analysis. No actual food portions visible for assessment.",
-  "portion_assessment_method": "MENU ANALYSIS ONLY - Cannot determine actual portions without seeing food on plate. All nutrition values are ESTIMATES based on USDA standard serving sizes. Actual restaurant portions may vary significantly."
-}
-
-MANDATORY REQUIREMENTS - DO NOT BE VAGUE:
-
-FOR FOOD PHOTOS:
-❌ NEVER confuse portions with servings - count distinct food items as portions, calculate number of servings based on USDA standards
-❌ NEVER say "4 servings" when you mean "4 portions" - be precise about USDA serving calculations
-❌ NEVER say "mixed vegetables" - specify "steamed broccoli florets, diced carrots"
-❌ NEVER say "chicken" - specify "grilled chicken breast"
-❌ NEVER say "average portion" - specify "6 oz portion covering 1/4 of plate = 2 USDA servings"
-❌ NEVER say "well-cooked" - specify "golden-brown with visible caramelization"
-
-✅ ALWAYS distinguish between food portions (distinct items) and USDA servings (standardized amounts)
-✅ ALWAYS calculate serving_multiplier based on USDA serving sizes
-✅ ALWAYS explain WHY you calculated the number of servings (e.g., "twice the standard serving size")
-✅ ALWAYS indicate if portions are larger/smaller than typical (helps with portion control)
-✅ ALWAYS describe exact colors, textures, sizes, shapes, cooking evidence
-✅ ALWAYS compare portions to visible objects (fork, plate, hand if visible)
-✅ ALWAYS explain if the food appears to be on a platter of food or a single plate of food
-✅ ALWAYS describe specific cooking methods you can see evidence of
-✅ ALWAYS count discrete items (3 broccoli florets, 4 potato wedges)
-✅ ALWAYS calculate nutrition from YOUR visual portion assessment
-✅ ALWAYS explain your reasoning with specific visual evidence
-✅ ALWAYS identify glycemic index category (low/medium/high GI) for carbohydrate-containing foods
-✅ ALWAYS explain how cooking method affects GI when visible (e.g., "well-cooked white rice = high GI ~73")
-✅ ALWAYS provide specific insulin timing guidance based on GI classification
-✅ ALWAYS consider how protein/fat in mixed meals may moderate carb absorption
-✅ ALWAYS assess food combinations and explain how low GI foods may balance high GI foods in the meal
-✅ ALWAYS note fiber content and processing level as factors affecting GI
-✅ ALWAYS consider food ripeness and cooking degree when assessing GI impact
-✅ ALWAYS calculate net carbs adjustment for fiber content >5g
-✅ ALWAYS provide specific insulin timing recommendations based on meal composition
-✅ ALWAYS include relevant safety alerts for the specific meal composition
-✅ ALWAYS calculate absorption_time_hours in the 2-6 hour range for basic analysis
-✅ ALWAYS provide absorption_time_reasoning explaining the calculation process
-
-FOR MENU ITEMS:
-❌ NEVER make assumptions about plate sizes, portions, or actual serving sizes
-❌ NEVER estimate visual portions when analyzing menu text only
-❌ NEVER claim to see cooking methods, textures, or visual details from menu text
-❌ NEVER multiply nutrition values by assumed restaurant portion sizes
-
-✅ ALWAYS set image_type to "menu_item" when analyzing menu text
-✅ ALWAYS set portion_estimate to "CANNOT DETERMINE - menu text only"
-✅ ALWAYS set serving_multiplier to 1.0 for menu items (USDA standard only)
-✅ ALWAYS set visual_cues to "NONE - menu text analysis only"
-✅ ALWAYS mark assessment_notes as "ESTIMATE ONLY - Based on USDA standard serving size"
-✅ ALWAYS use portion_assessment_method to explain this is menu analysis with no visual portions
-✅ ALWAYS provide actual USDA standard nutrition values (carbohydrates, protein, fat, calories)
-✅ ALWAYS calculate nutrition based on typical USDA serving sizes for the identified food type
-✅ ALWAYS include total nutrition fields even for menu items (based on USDA standards)
-✅ ALWAYS translate into the user's device native language or if unknown, translate into ENGLISH before analysing the menu item
-✅ ALWAYS provide glycemic index assessment for menu items based on typical preparation methods
-✅ ALWAYS include diabetes timing guidance even for menu items based on typical GI values
-
+Requirements:
+• Be specific about food names and portions
+• Compare to visible objects (fork, plate)
+• Calculate from YOUR visual assessment
+• Identify GI category and provide timing guidance
+• For menu items: set portion_estimate to "CANNOT DETERMINE - menu text only"
 """
 
-/// Enhanced analysis prompt with advanced macronutrient dosing and exercise considerations
-private let standardAnalysisPrompt = """
+/// Advanced analysis prompt with FPU calculations and exercise considerations (used when Advanced Dosing is ON)
+private let advancedAnalysisPrompt = """
 You are my personal certified diabetes nutrition specialist with advanced training in Fat/Protein Units (FPUs), fiber impact calculations, and exercise-aware nutrition management. You understand Servings compared to Portions and the importance of being educated about this. You are clinically minded but have a knack for explaining complicated nutrition information in layman's terms. Analyze this food image for optimal diabetes management with comprehensive insulin dosing guidance. Primary goal: accurate carbohydrate content for insulin dosing with advanced FPU calculations and timing recommendations. Do not over estimate the carbs or that could lead to user over dosing on insulin.
 
 FIRST: Determine if this image shows:
@@ -1367,7 +1244,8 @@ class ConfigurableAIService: ObservableObject {
             result = try await BasicFoodAnalysisService.shared.analyzeFoodImage(image, telemetryCallback: telemetryCallback)
         case .claude:
             let key = UserDefaults.standard.claudeAPIKey
-            let query = UserDefaults.standard.claudeQuery
+            // Use empty query to ensure only optimized prompts are used for performance
+            let query = ""
             guard !key.isEmpty else {
                 print("❌ Claude API key not configured")
                 throw AIFoodAnalysisError.noApiKey
@@ -1376,7 +1254,8 @@ class ConfigurableAIService: ObservableObject {
             result = try await ClaudeFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: key, query: query, telemetryCallback: telemetryCallback)
         case .googleGemini:
             let key = UserDefaults.standard.googleGeminiAPIKey
-            let query = UserDefaults.standard.googleGeminiQuery
+            // Use empty query to ensure only optimized prompts are used for performance
+            let query = ""
             guard !key.isEmpty else {
                 print("❌ Google Gemini API key not configured")
                 throw AIFoodAnalysisError.noApiKey
@@ -1385,7 +1264,8 @@ class ConfigurableAIService: ObservableObject {
             result = try await GoogleGeminiFoodAnalysisService.shared.analyzeFoodImage(image, apiKey: key, query: query, telemetryCallback: telemetryCallback)
         case .openAI:
             let key = UserDefaults.standard.openAIAPIKey
-            let query = UserDefaults.standard.openAIQuery
+            // Use empty query to ensure only optimized prompts are used for performance
+            let query = ""
             guard !key.isEmpty else {
                 print("❌ OpenAI API key not configured")
                 throw AIFoodAnalysisError.noApiKey
@@ -1801,7 +1681,17 @@ class OpenAIFoodAnalysisService {
                     "content": [
                         [
                             "type": "text",
-                            "text": query.isEmpty ? getAnalysisPrompt() : "\(query)\n\n\(getAnalysisPrompt())"
+                            "text": {
+                                let analysisPrompt = getAnalysisPrompt()
+                                let finalPrompt = query.isEmpty ? analysisPrompt : "\(query)\n\n\(analysisPrompt)"
+                                print("🔍 OpenAI Final Prompt Debug:")
+                                print("   Query isEmpty: \(query.isEmpty)")
+                                print("   Query length: \(query.count) characters")
+                                print("   Analysis prompt length: \(analysisPrompt.count) characters")
+                                print("   Final combined prompt length: \(finalPrompt.count) characters")
+                                print("   First 100 chars of final prompt: \(String(finalPrompt.prefix(100)))")
+                                return finalPrompt
+                            }()
                         ],
                         [
                             "type": "image_url",
