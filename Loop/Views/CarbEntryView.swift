@@ -413,9 +413,9 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             
             CardSectionDivider()
             
-            AbsorptionTimePickerRow(absorptionTime: $viewModel.absorptionTime, isFocused: absorptionTimeFocused, validDurationRange: viewModel.absorptionRimesRange, isAIGenerated: viewModel.absorptionTimeWasAIGenerated, showHowAbsorptionTimeWorks: $showHowAbsorptionTimeWorks)
+            AIAbsorptionTimePickerRow(absorptionTime: $viewModel.absorptionTime, isFocused: absorptionTimeFocused, validDurationRange: viewModel.absorptionRimesRange, isAIGenerated: viewModel.absorptionTimeWasAIGenerated, showHowAbsorptionTimeWorks: $showHowAbsorptionTimeWorks)
                 .onReceive(viewModel.$absorptionTimeWasAIGenerated) { isAIGenerated in
-                    print("🎯 AbsorptionTimePickerRow received isAIGenerated: \(isAIGenerated)")
+                    print("🎯 AIAbsorptionTimePickerRow received isAIGenerated: \(isAIGenerated)")
                 }
                 .padding(.bottom, 2)
         }
@@ -1518,5 +1518,95 @@ struct FoodItemDetailRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color(.systemGray4), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - AI-enabled AbsorptionTimePickerRow
+struct AIAbsorptionTimePickerRow: View {
+    @Binding private var absorptionTime: TimeInterval
+    @Binding private var isFocused: Bool
+    
+    private let validDurationRange: ClosedRange<TimeInterval>
+    private let minuteStride: Int
+    private let isAIGenerated: Bool
+    private var showHowAbsorptionTimeWorks: Binding<Bool>?
+    
+    init(absorptionTime: Binding<TimeInterval>, isFocused: Binding<Bool>, validDurationRange: ClosedRange<TimeInterval>, minuteStride: Int = 30, isAIGenerated: Bool = false, showHowAbsorptionTimeWorks: Binding<Bool>? = nil) {
+        self._absorptionTime = absorptionTime
+        self._isFocused = isFocused
+        self.validDurationRange = validDurationRange
+        self.minuteStride = minuteStride
+        self.isAIGenerated = isAIGenerated
+        self.showHowAbsorptionTimeWorks = showHowAbsorptionTimeWorks
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Absorption Time")
+                    .foregroundColor(.primary)
+                
+                if isAIGenerated {
+                    HStack(spacing: 4) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        Text("AI")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(6)
+                }
+                
+                if showHowAbsorptionTimeWorks != nil {
+                    Button(action: {
+                        isFocused = false
+                        showHowAbsorptionTimeWorks?.wrappedValue = true
+                    }) {
+                        Image(systemName: "info.circle")
+                            .font(.body)
+                            .foregroundColor(.accentColor)
+                    }
+                }
+                
+                Spacer()
+                
+                Text(durationString())
+                    .foregroundColor(isAIGenerated ? .blue : Color(UIColor.secondaryLabel))
+                    .fontWeight(isAIGenerated ? .medium : .regular)
+            }
+            
+            if isAIGenerated && !isFocused {
+                Text("AI suggested based on meal composition")
+                    .font(.caption2)
+                    .foregroundColor(.blue)
+                    .padding(.top, 2)
+            }
+            
+            if isFocused {
+                DurationPicker(duration: $absorptionTime, validDurationRange: validDurationRange, minuteInterval: minuteStride)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .onTapGesture {
+            withAnimation {
+                isFocused.toggle()
+            }
+        }
+    }
+    
+    private let durationFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute]
+        formatter.unitsStyle = .short
+        return formatter
+    }()
+    
+    private func durationString() -> String {
+        return durationFormatter.string(from: absorptionTime) ?? ""
     }
 }
