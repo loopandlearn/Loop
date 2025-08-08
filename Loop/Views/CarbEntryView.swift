@@ -291,11 +291,29 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                             HStack(alignment: .center, spacing: 12) {
                                 // Use AI analysis result if available, otherwise fall back to selected food
                                 let aiResult = viewModel.lastAIAnalysisResult
-                                let carbsValue = aiResult?.totalCarbohydrates ?? ((selectedFood.carbsPerServing ?? selectedFood.nutriments.carbohydrates) * viewModel.numberOfServings)
-                                let caloriesValue = aiResult?.totalCalories ?? (selectedFood.caloriesPerServing.map { $0 * viewModel.numberOfServings })
-                                let fatValue = aiResult?.totalFat ?? (selectedFood.fatPerServing.map { $0 * viewModel.numberOfServings })
-                                let fiberValue = aiResult?.totalFiber ?? (selectedFood.fiberPerServing.map { $0 * viewModel.numberOfServings })
-                                let proteinValue = aiResult?.totalProtein ?? (selectedFood.proteinPerServing.map { $0 * viewModel.numberOfServings })
+                                
+                                let (carbsValue, caloriesValue, fatValue, fiberValue, proteinValue): (Double, Double?, Double?, Double?, Double?) = {
+                                    if let aiResult = aiResult {
+                                        // For AI results: scale by current servings vs AI's baseline servings
+                                        let servingScale = viewModel.numberOfServings / aiResult.servings
+                                        return (
+                                            aiResult.totalCarbohydrates * servingScale,
+                                            aiResult.totalCalories.map { $0 * servingScale },
+                                            aiResult.totalFat.map { $0 * servingScale },
+                                            aiResult.totalFiber.map { $0 * servingScale },
+                                            aiResult.totalProtein.map { $0 * servingScale }
+                                        )
+                                    } else {
+                                        // For database foods: scale per-serving values by number of servings
+                                        return (
+                                            (selectedFood.carbsPerServing ?? selectedFood.nutriments.carbohydrates) * viewModel.numberOfServings,
+                                            selectedFood.caloriesPerServing.map { $0 * viewModel.numberOfServings },
+                                            selectedFood.fatPerServing.map { $0 * viewModel.numberOfServings },
+                                            selectedFood.fiberPerServing.map { $0 * viewModel.numberOfServings },
+                                            selectedFood.proteinPerServing.map { $0 * viewModel.numberOfServings }
+                                        )
+                                    }
+                                }()
                                 
                                 // Carbohydrates (first)
                                 NutritionCircle(
