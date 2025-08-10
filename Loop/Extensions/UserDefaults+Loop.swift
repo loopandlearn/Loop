@@ -30,6 +30,7 @@ extension UserDefaults {
         case analysisMode = "com.loopkit.Loop.analysisMode"
         case foodSearchEnabled = "com.loopkit.Loop.foodSearchEnabled"
         case advancedDosingRecommendationsEnabled = "com.loopkit.Loop.advancedDosingRecommendationsEnabled"
+        case useGPT5ForOpenAI = "com.loopkit.Loop.useGPT5ForOpenAI"
     }
 
     var legacyPumpManagerRawValue: PumpManager.RawValue? {
@@ -201,7 +202,36 @@ MANDATORY REQUIREMENTS:
     
     var openAIQuery: String {
         get {
-            return string(forKey: Key.openAIQuery.rawValue) ?? """
+            // Check if using GPT-5 - use optimized prompt for better performance
+            if UserDefaults.standard.useGPT5ForOpenAI {
+                return string(forKey: Key.openAIQuery.rawValue) ?? """
+Analyze this food image for diabetes management. Be specific and accurate.
+
+JSON format required:
+{
+  "food_items": [{
+    "name": "specific food name with preparation details",
+    "portion_estimate": "portion size with visual reference", 
+    "carbohydrates": grams_number,
+    "protein": grams_number,
+    "fat": grams_number,
+    "calories": kcal_number,
+    "serving_multiplier": decimal_servings
+  }],
+  "overall_description": "detailed visual description",
+  "total_carbohydrates": sum_carbs,
+  "total_protein": sum_protein, 
+  "total_fat": sum_fat,
+  "total_calories": sum_calories,
+  "confidence": decimal_0_to_1,
+  "diabetes_considerations": "carb sources and timing advice"
+}
+
+Requirements: Use exact visual details, compare to visible objects, calculate from visual assessment.
+"""
+            } else {
+                // Full detailed prompt for GPT-4 models
+                return string(forKey: Key.openAIQuery.rawValue) ?? """
 You are a nutrition expert analyzing this food image for diabetes management. Describe EXACTLY what you see in vivid detail.
 
 EXAMPLE of the detailed description I expect:
@@ -242,6 +272,7 @@ MANDATORY REQUIREMENTS:
 ✅ ALWAYS compare portions to visible objects (fork, plate, hand if visible)
 ✅ ALWAYS calculate nutrition from YOUR visual portion assessment
 """
+            }
         }
         set {
             set(newValue, forKey: Key.openAIQuery.rawValue)
@@ -358,6 +389,15 @@ MANDATORY REQUIREMENTS:
         }
         set {
             set(newValue, forKey: Key.advancedDosingRecommendationsEnabled.rawValue)
+        }
+    }
+    
+    var useGPT5ForOpenAI: Bool {
+        get {
+            return bool(forKey: Key.useGPT5ForOpenAI.rawValue)
+        }
+        set {
+            set(newValue, forKey: Key.useGPT5ForOpenAI.rawValue)
         }
     }
 }

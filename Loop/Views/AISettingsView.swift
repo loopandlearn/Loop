@@ -52,6 +52,9 @@ struct AISettingsView: View {
     // Feature flag for Advanced Dosing Recommendations
     @State private var advancedDosingRecommendationsEnabled: Bool = UserDefaults.standard.advancedDosingRecommendationsEnabled
     
+    // GPT-5 feature flag
+    @State private var useGPT5ForOpenAI: Bool = UserDefaults.standard.useGPT5ForOpenAI
+    
     init() {
         _claudeKey = State(initialValue: ConfigurableAIService.shared.getAPIKey(for: .claude) ?? "")
         _claudeQuery = State(initialValue: ConfigurableAIService.shared.getQuery(for: .claude) ?? "")
@@ -72,9 +75,22 @@ struct AISettingsView: View {
                 
                 // Advanced Dosing Recommendations Section
                 Section(header: Text("Advanced Dosing Recommendations"), 
-                       footer: Text("Enable advanced dosing advice including Fat/Protein Units (FPUs) calculations, extended bolus timing, and absorption time estimates. FPUs help account for the delayed glucose impact from fat and protein in meals, which can affect blood sugar 3-8 hours after eating.")) {
+                       footer: Text("Enable advanced dosing advice including Fat/Protein Units (FPUs) calculations, extended bolus timing, excersize impact, and absorption time estimates. FPUs help account for the delayed glucose impact from fat and protein in meals, which can affect blood sugar 3-8 hours after eating.")) {
                     Toggle("Advanced Dosing Recommendations", isOn: $advancedDosingRecommendationsEnabled)
                         .disabled(!foodSearchEnabled)
+                }
+                
+                // GPT-5 Feature Section - Only show when OpenAI is selected for AI Image Analysis
+                if aiService.aiImageSearchProvider.rawValue.contains("OpenAI") {
+                    Section(header: Text("OpenAI GPT-5 (Latest)"), 
+                           footer: Text("Enable GPT-5, GPT-5-mini, and GPT-5-nano models for OpenAI analysis. Standard Quality uses GPT-5, Fast Mode uses GPT-5-nano for ultra-fast analysis. GPT-5 takes longer to perform analysis but these are the latest models with significant improvements in health advisory accuracy. Fallback to GPT-4o if unavailable.")) {
+                        Toggle("Use GPT-5 Models", isOn: $useGPT5ForOpenAI)
+                            .disabled(!foodSearchEnabled)
+                            .onChange(of: useGPT5ForOpenAI) { _ in
+                                // Trigger view refresh to update Analysis Mode descriptions
+                                aiService.objectWillChange.send()
+                            }
+                    }
                 }
                 
                 // Only show configuration sections if feature is enabled
@@ -482,6 +498,7 @@ struct AISettingsView: View {
         // Feature flag settings
         UserDefaults.standard.foodSearchEnabled = foodSearchEnabled
         UserDefaults.standard.advancedDosingRecommendationsEnabled = advancedDosingRecommendationsEnabled
+        UserDefaults.standard.useGPT5ForOpenAI = useGPT5ForOpenAI
         
         // API key and query settings
         aiService.setAPIKey(claudeKey, for: .claude)

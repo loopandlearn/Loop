@@ -493,14 +493,13 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
         // Set the number of servings from AI analysis AFTER selecting the product
         viewModel.numberOfServings = result.servings
         
-        // Set dynamic absorption time if advanced dosing is enabled
+        // Set dynamic absorption time from AI analysis (works for both Standard and Advanced modes)
         print("🤖 AI ABSORPTION TIME DEBUG:")
         print("🤖 Advanced Dosing Enabled: \(UserDefaults.standard.advancedDosingRecommendationsEnabled)")
         print("🤖 AI Absorption Hours: \(result.absorptionTimeHours ?? 0)")
         print("🤖 Current Absorption Time: \(viewModel.absorptionTime)")
         
-        if UserDefaults.standard.advancedDosingRecommendationsEnabled,
-           let absorptionHours = result.absorptionTimeHours,
+        if let absorptionHours = result.absorptionTimeHours,
            absorptionHours > 0 {
             let absorptionTimeInterval = TimeInterval(absorptionHours * 3600) // Convert hours to seconds
             

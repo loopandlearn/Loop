@@ -122,15 +122,18 @@ internal func getAnalysisPrompt() -> String {
 
 /// Standard analysis prompt for basic diabetes management (used when Advanced Dosing is OFF)
 private let standardAnalysisPrompt = """
-FAST MODE v3.0 - You are my diabetes nutrition specialist. Analyze this food image for accurate carbohydrate counting. Do not over estimate carbs.
+STANDARD MODE v4.1 - You are my diabetes nutrition specialist. Analyze this food image for accurate carbohydrate counting. Do not over estimate carbs.
 
-Determine if this shows:
-1. ACTUAL FOOD (analyze portions)  
-2. MENU TEXT (provide USDA standard servings only)
+LANGUAGE HANDLING: If you see text in any language (Spanish, French, Italian, German, Chinese, Japanese, Korean, etc.), first identify and translate the food names to English, then proceed with analysis. Always respond in English.
+
+FIRST: Determine if this image shows:
+1. ACTUAL FOOD ON A PLATE, PLATTER, or CONTAINER (analyze portions and proceed with portion analysis)  
+2. MENU TEXT (identify language, translate food names, provide USDA standard serving estimates only)
+3. RECIPE TEXT (assume and provide USDA standard serving estimates only)
 
 Key concepts:
 • PORTIONS = distinct food items visible
-• SERVINGS = USDA standard amounts (3oz chicken, 1/2 cup rice)
+• SERVINGS = compare to USDA standard amounts (3oz chicken, 1/2 cup rice)
 • Calculate serving multipliers vs USDA standards
 
 Glycemic Index:
@@ -159,7 +162,7 @@ RESPOND IN JSON FORMAT:
       "fat": grams_for_this_portion,
       "fiber": grams_for_this_portion,
       "protein": grams_for_this_portion,
-      "assessment_notes": "how I calculated this portion"
+      "assessment_notes": "Explain how you calculated this specific portion size, what visual references you used for measurement, and how you determined the USDA serving multiplier. Write in natural, conversational language."
     }
   ],
   "total_food_portions": count_distinct_items,
@@ -178,35 +181,89 @@ RESPOND IN JSON FORMAT:
   "safety_alerts": "Any safety considerations",
   "visual_assessment_details": "Textures, colors, cooking evidence",
   "overall_description": "What I see: plate, arrangement, textures, colors",
-  "portion_assessment_method": "How I estimated using visual references vs USDA serving sizes"
+  "portion_assessment_method": "Explain in natural language how you estimated portion sizes using visual references like plate size, utensils, or other objects for scale. Describe your measurement process for each food item and explain how you converted visual portions to USDA serving equivalents. Include your confidence level and what factors affected your accuracy."
 }
 
-Requirements:
-• Be specific about food names and portions
-• Compare to visible objects (fork, plate)
-• Calculate from YOUR visual assessment
-• Identify GI category and provide timing guidance
-• For menu items: set portion_estimate to "CANNOT DETERMINE - menu text only"
+MANDATORY REQUIREMENTS - DO NOT BE VAGUE:
+FOR FOOD PHOTOS:
+❌ NEVER confuse portions with servings - count distinct food items as portions, calculate number of servings based on USDA standards
+❌ NEVER say "4 servings" when you mean "4 portions" - be precise about USDA serving calculations
+❌ NEVER say "mixed vegetables" - specify "steamed broccoli florets, diced carrots"
+❌ NEVER say "chicken" - specify "grilled chicken breast"
+❌ NEVER say "average portion" - specify "6 oz portion covering 1/4 of plate = 2 USDA servings"
+❌ NEVER say "well-cooked" - specify "golden-brown with visible caramelization"
+
+✅ ALWAYS distinguish between food portions (distinct items) and USDA servings (standardized amounts)
+✅ ALWAYS calculate serving_multiplier based on USDA serving sizes
+✅ ALWAYS explain WHY you calculated the number of servings (e.g., "twice the standard serving size")
+✅ ALWAYS indicate if portions are larger/smaller than typical (helps with portion control)
+✅ ALWAYS describe exact colors, textures, sizes, shapes, cooking evidence
+✅ ALWAYS compare portions to visible objects (fork, plate, hand if visible)
+✅ ALWAYS explain if the food appears to be on a platter of food or a single plate of food
+✅ ALWAYS describe specific cooking methods you can see evidence of
+✅ ALWAYS count discrete items (3 broccoli florets, 4 potato wedges)
+✅ ALWAYS calculate nutrition from YOUR visual portion assessment
+✅ ALWAYS explain your reasoning with specific visual evidence
+✅ ALWAYS identify glycemic index category (low/medium/high GI) for carbohydrate-containing foods
+✅ ALWAYS explain how cooking method affects GI when visible (e.g., "well-cooked white rice = high GI ~73")
+✅ ALWAYS provide specific insulin timing guidance based on GI classification
+✅ ALWAYS consider how protein/fat in mixed meals may moderate carb absorption
+✅ ALWAYS assess food combinations and explain how low GI foods may balance high GI foods in the meal
+✅ ALWAYS note fiber content and processing level as factors affecting GI
+✅ ALWAYS consider food ripeness and cooking degree when assessing GI impact
+✅ ALWAYS calculate Fat/Protein Units (FPUs) and provide classification (Low/Medium/High)
+✅ ALWAYS calculate net carbs adjustment for fiber content >5g
+✅ ALWAYS provide specific insulin timing recommendations based on meal composition
+✅ ALWAYS include FPU-based dosing guidance for extended insulin needs
+✅ ALWAYS consider exercise timing and provide specific insulin adjustments
+✅ ALWAYS include relevant safety alerts for the specific meal composition
+✅ ALWAYS provide quantitative dosing percentages and timing durations
+✅ ALWAYS calculate absorption_time_hours based on meal composition (FPUs, fiber, meal size)
+✅ ALWAYS provide detailed absorption_time_reasoning showing the calculation process
+✅ ALWAYS consider that Loop will highlight non-default absorption times in blue to alert user
+
+FOR MENU AND RECIPE ITEMS:
+❌ NEVER make assumptions about plate sizes, portions, or actual serving sizes
+❌ NEVER estimate visual portions when analyzing menu text only
+❌ NEVER claim to see cooking methods, textures, or visual details from menu text
+❌ NEVER multiply nutrition values by assumed restaurant portion sizes
+
+✅ ALWAYS set image_type to "menu_item" when analyzing menu text
+✅ ALWAYS set portion_estimate to "CANNOT DETERMINE - menu text only"
+✅ ALWAYS set serving_multiplier to 1.0 for menu items (USDA standard only)
+✅ ALWAYS set visual_cues to "NONE - menu text analysis only"
+✅ ALWAYS mark assessment_notes as "ESTIMATE ONLY - Based on USDA standard serving size"
+✅ ALWAYS use portion_assessment_method to explain this is menu analysis with no visual portions
+✅ ALWAYS provide actual USDA standard nutrition values (carbohydrates, protein, fat, calories)
+✅ ALWAYS calculate nutrition based on typical USDA serving sizes for the identified food type
+✅ ALWAYS include total nutrition fields even for menu items (based on USDA standards)
+✅ ALWAYS translate into the user's device native language or if unknown, translate into ENGLISH before analysing the menu item
+✅ ALWAYS provide glycemic index assessment for menu items based on typical preparation methods
+✅ ALWAYS include diabetes timing guidance even for menu items based on typical GI values
+
 """
 
 /// Advanced analysis prompt with FPU calculations and exercise considerations (used when Advanced Dosing is ON)
 private let advancedAnalysisPrompt = """
-You are my personal certified diabetes nutrition specialist with advanced training in Fat/Protein Units (FPUs), fiber impact calculations, and exercise-aware nutrition management. You understand Servings compared to Portions and the importance of being educated about this. You are clinically minded but have a knack for explaining complicated nutrition information in layman's terms. Analyze this food image for optimal diabetes management with comprehensive insulin dosing guidance. Primary goal: accurate carbohydrate content for insulin dosing with advanced FPU calculations and timing recommendations. Do not over estimate the carbs or that could lead to user over dosing on insulin.
+You are my personal certified diabetes nutrition specialist with advanced training in Fat/Protein Units (FPUs), fiber impact calculations, and exercise-aware nutrition management. You understand Servings compared to Portions and the importance of being educated about this. You are clinically minded but have a knack for explaining complicated nutrition information in layman's terms. Analyze this food image for optimal diabetes management with comprehensive insulin dosing guidance. Primary goal: accurate carbohydrate content for insulin dosing with advanced FPU calculations and timing recommendations. Do not over estimate the carbs, when in doubt estimate on the side of caution; over-estimating could lead to user over dosing on insulin.
+
+LANGUAGE HANDLING: If you see text in any language (Spanish, French, Italian, German, Chinese, Japanese, Korean, Arabic, etc.), first identify and translate the food names to English, then proceed with analysis. Always respond in English.
 
 FIRST: Determine if this image shows:
 1. ACTUAL FOOD ON A PLATE/PLATTER/CONTAINER (proceed with portion analysis)
-2. MENU TEXT/DESCRIPTIONS (provide USDA standard servings only, clearly marked as estimates)
+2. MENU TEXT/DESCRIPTIONS (identify language, translate food names, provide USDA standard servings only, clearly marked as estimates)
+3. RECIPE TEXT (identify language, translate food names, provide USDA standard serving estimates only)
 
 KEY CONCEPTS FOR ACTUAL FOOD PHOTOS:
 • PORTIONS = distinct food items visible
-• SERVINGS = USDA standard amounts (3oz chicken, 1/2 cup rice/vegetables)
+• SERVINGS = compare to USDA standard amounts (3oz chicken, 1/2 cup rice/vegetables)
 • Calculate serving multipliers vs USDA standards
 
-KEY CONCEPTS FOR MENU ITEMS:
+KEY CONCEPTS FOR MENU OR RECIPE ITEMS:
 • NO PORTION ANALYSIS possible without seeing actual food
 • Provide ONLY USDA standard serving information
 • Mark all values as "estimated based on USDA standards"
-• Cannot assess actual portions or plate sizes from menu text
+• Cannot assess actual portions or plate sizes from menu or receipt text
 
 EXAMPLE: Chicken (6oz = 2 servings), Rice (1 cup = 2 servings), Vegetables (1/2 cup = 1 serving)
 
@@ -373,7 +430,7 @@ FOR ACTUAL FOOD PHOTOS:
       "name": "specific food name with exact preparation detail I can see (e.g., 'char-grilled chicken breast with grill marks', 'steamed white jasmine rice with separated grains')",
       "portion_estimate": "exact portion with visual references (e.g., '6 oz grilled chicken breast - length of my palm, thickness of deck of cards based on fork comparison', '1.5 cups steamed rice - covers 1/3 of the 10-inch plate')",
       "usda_serving_size": "standard USDA serving size for this food (e.g., '3 oz for chicken breast', '1/2 cup for cooked rice', '1/2 cup for cooked vegetables')",
-      "serving_multiplier": "how many USDA servings I estimate in this visual portion (e.g., 2.0 for 6oz chicken since USDA serving is 3oz)",
+      "serving_multiplier": number_of_USDA_servings_for_this_portion,
       "preparation_method": "specific cooking details I observe (e.g., 'grilled at high heat - evident from dark crosshatch marks and slight charring on edges', 'steamed perfectly - grains are separated and fluffy, no oil sheen visible')",
       "visual_cues": "exact visual elements I'm analyzing (e.g., 'measuring chicken against 7-inch fork length, rice portion covers exactly 1/3 of plate diameter, broccoli florets are uniform bright green')",
       "carbohydrates": number_in_grams_for_this_exact_portion,
@@ -381,7 +438,7 @@ FOR ACTUAL FOOD PHOTOS:
       "fat": number_in_grams_for_this_exact_portion,
       "fiber": number_in_grams_for_this_exact_portion,
       "protein": number_in_grams_for_this_exact_portion,
-      "assessment_notes": "step-by-step explanation how I calculated this portion using visible objects and measurements, then compared to USDA serving sizes"
+      "assessment_notes": "Describe in natural language how you calculated this food item's portion size, what visual clues you used for measurement, and how you determined the USDA serving multiplier. Be conversational and specific about your reasoning process."
     }
   ],
   "total_food_portions": count_of_distinct_food_items,
@@ -398,14 +455,14 @@ FOR ACTUAL FOOD PHOTOS:
   "insulin_timing_recommendations": "MEAL TYPE: [Simple/Complex/High Fat-Protein]. PRE-MEAL INSULIN TIMING: [specific minutes before eating]. BOLUS STRATEGY: [immediate percentage]% now, [extended percentage]% over [duration] hours if applicable. MONITORING: Check BG at [specific times] post-meal",
   "fpu_dosing_guidance": "FPU LEVEL: [Low/Medium/High] ([calculated FPUs]). ADDITIONAL INSULIN: Consider [percentage]% extra insulin over [duration] hours for protein/fat. EXTENDED BOLUS: [specific recommendations for pump users]. MDI USERS: [split dosing recommendations]",
   "exercise_considerations": "PRE-EXERCISE: [specific guidance if meal within 6 hours of planned activity]. POST-EXERCISE: [recommendations if within 6 hours of recent exercise]. INSULIN ADJUSTMENTS: [specific percentage reductions if applicable]",
-  "absorption_time_hours": number_of_hours_between_1_and_24,
-  "absorption_time_reasoning": "CALCULATION: Based on [meal composition factors]. FPU IMPACT: [how FPUs affect absorption]. FIBER EFFECT: [how fiber content impacts timing]. MEAL SIZE: [how calories affect gastric emptying]. RECOMMENDED: [final hours recommendation with explanation]. IMPORTANT: Explain WHY this absorption time differs from the default 3-hour standard if it does, so the user understands the reasoning.",
+  "absorption_time_hours": hours_between_2_and_6,
+  "absorption_time_reasoning": "Based on [meal composition factors]. FPU IMPACT: [how FPUs affect absorption]. FIBER EFFECT: [how fiber content impacts timing]. MEAL SIZE: [how calories affect gastric emptying]. RECOMMENDED: [final hours recommendation with explanation]. IMPORTANT: Explain WHY this absorption time differs from the default 3-hour standard if it does, so the user understands the reasoning.",
   "meal_size_impact": "MEAL SIZE: [Small <400 kcal / Medium 400-800 kcal / Large >800 kcal]. GASTRIC EMPTYING: [impact on absorption timing]. DOSING MODIFICATIONS: [specific adjustments for meal size effects]",
   "individualization_factors": "PATIENT FACTORS: [Consider age, pregnancy, illness, menstrual cycle, temperature effects]. TECHNOLOGY: [Pump vs MDI considerations]. PERSONAL PATTERNS: [Recommendations for tracking individual response]",
   "safety_alerts": "[Any specific safety considerations: dawn phenomenon, gastroparesis, pregnancy, alcohol, recent hypoglycemia, current hyperglycemia, illness, temperature extremes, etc.]",
-  "visual_assessment_details": "FOR FOOD PHOTOS: [textures, colors, cooking evidence]. FOR MENU ITEMS: Menu text shows [description from menu]. Cannot assess visual food qualities from menu text alone.",
+  "visual_assessment_details": "FOR FOOD PHOTOS: [textures, colors, cooking evidence]. FOR MENU OR RECIPE ITEMS: Menu text shows [description from menu]. Cannot assess visual food qualities from menu text alone.",
   "overall_description": "[describe plate size]. The food is arranged [describe arrangement]. The textures I observe are [specific textures]. The colors are [specific colors]. The cooking methods evident are [specific evidence]. Any utensils visible are [describe utensils]. The background shows [describe background].",
-  "portion_assessment_method": "The plate size is based on [method]. I compared the protein to [reference object]. The rice portion was estimated by [specific visual reference]. I estimated the vegetables by [method]. SERVING SIZE REASONING: [Explain why you calculated the number of servings]. My confidence is based on [specific visual cues available]."
+  "portion_assessment_method": "Provide a detailed but natural explanation of your measurement methodology. Describe how you determined plate size, what reference objects you used for scale, your process for measuring each food item, how you estimated weights from visual cues, and how you calculated USDA serving equivalents. Include your confidence level and what factors affected measurement accuracy. Write conversationally, not as a numbered list."
 }
 
 FOR MENU ITEMS:
@@ -440,8 +497,8 @@ FOR MENU ITEMS:
   "insulin_timing_recommendations": "MEAL TYPE: [Simple/Complex/High Fat-Protein]. PRE-MEAL INSULIN TIMING: [specific minutes before eating]. BOLUS STRATEGY: [immediate percentage]% now, [extended percentage]% over [duration] hours if applicable. MONITORING: Check BG at [specific times] post-meal",
   "fpu_dosing_guidance": "FPU LEVEL: [Low/Medium/High] ([calculated FPUs]). ADDITIONAL INSULIN: Consider [percentage]% extra insulin over [duration] hours for protein/fat. EXTENDED BOLUS: [specific recommendations for pump users]. MDI USERS: [split dosing recommendations]",
   "exercise_considerations": "PRE-EXERCISE: [specific guidance if meal within 6 hours of planned activity]. POST-EXERCISE: [recommendations if within 6 hours of recent exercise]. INSULIN ADJUSTMENTS: [specific percentage reductions if applicable]",
-  "absorption_time_hours": number_of_hours_between_1_and_24,
-  "absorption_time_reasoning": "CALCULATION: Based on [meal composition factors]. FPU IMPACT: [how FPUs affect absorption]. FIBER EFFECT: [how fiber content impacts timing]. MEAL SIZE: [how calories affect gastric emptying]. RECOMMENDED: [final hours recommendation with explanation]. IMPORTANT: Explain WHY this absorption time differs from the default 3-hour standard if it does, so the user understands the reasoning.",
+  "absorption_time_hours": hours_between_2_and_6,
+  "absorption_time_reasoning": "Based on [meal composition factors]. FPU IMPACT: [how FPUs affect absorption]. FIBER EFFECT: [how fiber content impacts timing]. MEAL SIZE: [how calories affect gastric emptying]. RECOMMENDED: [final hours recommendation with explanation]. IMPORTANT: Explain WHY this absorption time differs from the default 3-hour standard if it does, so the user understands the reasoning.",
   "meal_size_impact": "MEAL SIZE: [Small <400 kcal / Medium 400-800 kcal / Large >800 kcal]. GASTRIC EMPTYING: [impact on absorption timing]. DOSING MODIFICATIONS: [specific adjustments for meal size effects]",
   "individualization_factors": "PATIENT FACTORS: [Consider age, pregnancy, illness, menstrual cycle, temperature effects]. TECHNOLOGY: [Pump vs MDI considerations]. PERSONAL PATTERNS: [Recommendations for tracking individual response]",
   "safety_alerts": "[Any specific safety considerations: dawn phenomenon, gastroparesis, pregnancy, alcohol, recent hypoglycemia, current hyperglycemia, illness, temperature extremes, etc.]",
@@ -483,7 +540,7 @@ If menu shows "Grilled Chicken Caesar Salad", respond:
   "fpu_dosing_guidance": "FPU LEVEL: Medium-High (3.7 FPUs). ADDITIONAL INSULIN: Consider 15-20% extra insulin over 3-4 hours for protein conversion. EXTENDED BOLUS: Use square wave 50%/50% over 3-4 hours. MDI USERS: Consider small additional injection at 2-3 hours post-meal",
   "exercise_considerations": "PRE-EXERCISE: Ideal pre-workout meal due to sustained energy from protein/fat. POST-EXERCISE: Good recovery meal if within 2 hours of exercise. INSULIN ADJUSTMENTS: Reduce insulin by 25-30% if recent exercise",
   "absorption_time_hours": 5,
-  "absorption_time_reasoning": "CALCULATION: Based on low carbs (8g) but high protein/fat. FPU IMPACT: 3.7 FPUs (Medium-High) adds 3 hours to baseline. FIBER EFFECT: Low fiber minimal impact. MEAL SIZE: Medium 250 kcal adds 1 hour. RECOMMENDED: 5 hours total (2 hour baseline + 3 FPU hours + 1 size hour) to account for extended protein conversion",
+  "absorption_time_reasoning": "Based on low carbs (8g) but high protein/fat. FPU IMPACT: 3.7 FPUs (Medium-High) adds 3 hours to baseline. FIBER EFFECT: Low fiber minimal impact. MEAL SIZE: Medium 250 kcal adds 1 hour. RECOMMENDED: 5 hours total (2 hour baseline + 3 FPU hours + 1 size hour) to account for extended protein conversion",
   "meal_size_impact": "MEAL SIZE: Medium 250 kcal. GASTRIC EMPTYING: Normal rate expected due to moderate calories and liquid content. DOSING MODIFICATIONS: No size-related adjustments needed",
   "individualization_factors": "PATIENT FACTORS: Standard adult dosing applies unless pregnancy/illness present. TECHNOLOGY: Pump users can optimize with precise extended bolus; MDI users should consider split injection. PERSONAL PATTERNS: Track 4-hour post-meal glucose to optimize protein dosing",
   "safety_alerts": "Low carb content minimizes hypoglycemia risk. High protein may cause delayed glucose rise 3-5 hours post-meal - monitor extended.",
@@ -525,7 +582,7 @@ If menu shows "Teriyaki Chicken Bowl with White Rice", respond:
   "fpu_dosing_guidance": "FPU LEVEL: Medium (3.4 FPUs). ADDITIONAL INSULIN: Consider 10-15% extra insulin over 2-3 hours for protein. EXTENDED BOLUS: Use dual wave 70%/30% over 2-3 hours. MDI USERS: Main bolus now, small follow-up at 2 hours if needed",
   "exercise_considerations": "PRE-EXERCISE: Good energy for cardio if consumed 1-2 hours before. POST-EXERCISE: Excellent recovery meal within 30 minutes. INSULIN ADJUSTMENTS: Reduce total insulin by 20-25% if recent exercise",
   "absorption_time_hours": 4,
-  "absorption_time_reasoning": "CALCULATION: Based on high carbs (35g) with medium protein/fat. FPU IMPACT: 3.4 FPUs (Medium) adds 2 hours to baseline. FIBER EFFECT: Low fiber (1.5g) minimal impact. MEAL SIZE: Medium 320 kcal adds 1 hour. RECOMMENDED: 4 hours total (3 hour baseline for complex carbs + 2 FPU hours + 1 size hour - 1 hour reduction for white rice being processed/quick-absorbing)",
+  "absorption_time_reasoning": "Based on high carbs (35g) with medium protein/fat. FPU IMPACT: 3.4 FPUs (Medium) adds 2 hours to baseline. FIBER EFFECT: Low fiber (1.5g) minimal impact. MEAL SIZE: Medium 320 kcal adds 1 hour. RECOMMENDED: 4 hours total (3 hour baseline for complex carbs + 2 FPU hours + 1 size hour - 1 hour reduction for white rice being processed/quick-absorbing)",
   "safety_alerts": "High GI rice may cause rapid BG spike - monitor closely at 1 hour. Protein may extend glucose response beyond 3 hours.",
   "visual_assessment_details": "Menu text shows 'Teriyaki Chicken Bowl with White Rice'. Cannot assess visual food qualities from menu text alone.",
   "overall_description": "Menu item text analysis. No actual food portions visible for assessment.",
@@ -565,7 +622,7 @@ If menu shows "Quinoa Bowl with Sweet Potato and Black Beans", respond:
   "fpu_dosing_guidance": "FPU LEVEL: Low (1.6 FPUs). ADDITIONAL INSULIN: Minimal extra needed for protein/fat. EXTENDED BOLUS: Use slight tail 80%/20% over 2 hours. MDI USERS: Single injection should suffice",
   "exercise_considerations": "PRE-EXERCISE: Excellent sustained energy meal for endurance activities. POST-EXERCISE: Good recovery with complex carbs and plant protein. INSULIN ADJUSTMENTS: Reduce insulin by 15-20% if recent exercise",
   "absorption_time_hours": 6,
-  "absorption_time_reasoning": "CALCULATION: Based on complex carbs with high fiber and low FPUs. FPU IMPACT: 1.6 FPUs (Low) adds 1 hour to baseline. FIBER EFFECT: High fiber (8.5g) adds 2 hours due to significant gastric emptying delay. MEAL SIZE: Medium 285 kcal adds 1 hour. RECOMMENDED: 6 hours total (3 hour baseline for complex carbs + 1 FPU hour + 2 fiber hours + 1 size hour) to account for sustained release from high fiber content",
+  "absorption_time_reasoning": "Based on complex carbs with high fiber and low FPUs. FPU IMPACT: 1.6 FPUs (Low) adds 1 hour to baseline. FIBER EFFECT: High fiber (8.5g) adds 2 hours due to significant gastric emptying delay. MEAL SIZE: Medium 285 kcal adds 1 hour. RECOMMENDED: 6 hours total (3 hour baseline for complex carbs + 1 FPU hour + 2 fiber hours + 1 size hour) to account for sustained release from high fiber content",
   "safety_alerts": "High fiber significantly blunts glucose response - avoid over-dosing insulin. Gradual rise may delay hypoglycemia symptoms.",
   "visual_assessment_details": "Menu text shows 'Quinoa Bowl with Sweet Potato and Black Beans'. Cannot assess visual food qualities from menu text alone.",
   "overall_description": "Menu item text analysis. No actual food portions visible for assessment.",
@@ -611,7 +668,7 @@ FOR FOOD PHOTOS:
 ✅ ALWAYS provide detailed absorption_time_reasoning showing the calculation process
 ✅ ALWAYS consider that Loop will highlight non-default absorption times in blue to alert user
 
-FOR MENU ITEMS:
+FOR MENU AND RECIPE ITEMS:
 ❌ NEVER make assumptions about plate sizes, portions, or actual serving sizes
 ❌ NEVER estimate visual portions when analyzing menu text only
 ❌ NEVER claim to see cooking methods, textures, or visual details from menu text
@@ -1359,11 +1416,15 @@ class ConfigurableAIService: ObservableObject {
         }
         
         var detailedDescription: String {
+            let gpt5Enabled = UserDefaults.standard.useGPT5ForOpenAI
+            
             switch self {
             case .standard:
-                return "Uses full AI models (GPT-4o, Gemini-1.5-Pro, Claude-3.5-Sonnet) for maximum accuracy. Best for complex meals with multiple components."
+                let openAIModel = gpt5Enabled ? "GPT-5" : "GPT-4o"
+                return "Uses full AI models (\(openAIModel), Gemini-1.5-Pro, Claude-3.5-Sonnet) for maximum accuracy. Best for complex meals with multiple components."
             case .fast:
-                return "Uses optimized models (GPT-4o-mini, Gemini-1.5-Flash) for faster analysis. 2-3x faster with ~5-10% accuracy trade-off. Great for simple meals."
+                let openAIModel = gpt5Enabled ? "GPT-5-nano" : "GPT-4o-mini"
+                return "Uses optimized models (\(openAIModel), Gemini-1.5-Flash) for faster analysis. 2-3x faster with ~5-10% accuracy trade-off. Great for simple meals."
             }
         }
         
@@ -1410,7 +1471,12 @@ class ConfigurableAIService: ObservableObject {
         case .googleGemini:
             return 15  // Free tier optimization - faster but may timeout on complex analysis
         case .openAI:
-            return 20  // Paid tier reliability - good balance of speed and reliability
+            // Check if using GPT-5 models which need more time
+            if UserDefaults.standard.useGPT5ForOpenAI {
+                return 60  // GPT-5 models need significantly more time for processing
+            } else {
+                return 20  // GPT-4o models - good balance of speed and reliability
+            }
         case .claude:
             return 25  // Highest quality responses but slower processing
         case .openFoodFacts, .usdaFoodData:
@@ -1426,9 +1492,11 @@ class ConfigurableAIService: ObservableObject {
         case (.googleGemini, .fast):
             return "gemini-1.5-flash"  // ~2x faster
         case (.openAI, .standard):
-            return "gpt-4o"
+            // Use GPT-5 if user enabled it, otherwise use GPT-4o
+            return UserDefaults.standard.useGPT5ForOpenAI ? "gpt-5" : "gpt-4o"
         case (.openAI, .fast):
-            return "gpt-4o-mini"  // ~3x faster
+            // Use GPT-5-nano for fastest analysis if user enabled GPT-5, otherwise use GPT-4o-mini
+            return UserDefaults.standard.useGPT5ForOpenAI ? "gpt-5-nano" : "gpt-4o-mini"
         case (.claude, .standard):
             return "claude-3-5-sonnet-20241022"
         case (.claude, .fast):
@@ -1521,7 +1589,10 @@ class ConfigurableAIService: ObservableObject {
     
     /// Parallel strategy for good networks
     private func analyzeWithParallelStrategy(_ image: UIImage, providers: [SearchProvider], query: String, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
-        let timeout = NetworkQualityMonitor.shared.recommendedTimeout
+        // Use the maximum timeout from all providers, with special handling for GPT-5
+        let timeout = providers.map { provider in
+            max(ConfigurableAIService.optimalTimeout(for: provider), NetworkQualityMonitor.shared.recommendedTimeout)
+        }.max() ?? NetworkQualityMonitor.shared.recommendedTimeout
         
         return try await withThrowingTaskGroup(of: AIFoodAnalysisResult.self) { group in
             // Add timeout wrapper for each provider
@@ -1558,15 +1629,18 @@ class ConfigurableAIService: ObservableObject {
     
     /// Sequential strategy for poor networks - tries providers one by one
     private func analyzeWithSequentialStrategy(_ image: UIImage, providers: [SearchProvider], query: String, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
-        let timeout = NetworkQualityMonitor.shared.recommendedTimeout
+        // Use provider-specific timeout, with special handling for GPT-5
+        let baseTimeout = NetworkQualityMonitor.shared.recommendedTimeout
         var lastError: Error?
         
         // Try providers one by one until one succeeds
         for provider in providers {
             do {
-                print("🔄 Trying \(provider.rawValue) sequentially...")
+                // Use provider-specific timeout for each provider
+                let providerTimeout = max(ConfigurableAIService.optimalTimeout(for: provider), baseTimeout)
+                print("🔄 Trying \(provider.rawValue) sequentially with \(providerTimeout)s timeout...")
                 telemetryCallback?("🤖 Trying \(provider.rawValue)...")
-                let result = try await withTimeoutForAnalysis(seconds: timeout) {
+                let result = try await withTimeoutForAnalysis(seconds: providerTimeout) {
                     try await self.analyzeWithSingleProvider(image, provider: provider, query: query)
                 }
                 print("✅ \(provider.rawValue) succeeded in sequential mode")
@@ -1635,6 +1709,273 @@ class ConfigurableAIService: ObservableObject {
 }
 
 
+// MARK: - GPT-5 Enhanced Request Handling
+
+/// Performs a GPT-5 request with retry logic and enhanced timeout handling
+private func performGPT5RequestWithRetry(request: URLRequest, telemetryCallback: ((String) -> Void)?) async throws -> (Data, URLResponse) {
+    let maxRetries = 2
+    var lastError: Error?
+    
+    for attempt in 1...maxRetries {
+        do {
+            print("🔧 GPT-5 Debug - Attempt \(attempt)/\(maxRetries)")
+            telemetryCallback?("🔄 GPT-5 attempt \(attempt)/\(maxRetries)...")
+            
+            // Create a custom URLSession with extended timeout for GPT-5
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 150    // 2.5 minutes request timeout
+            config.timeoutIntervalForResource = 180   // 3 minutes resource timeout
+            let session = URLSession(configuration: config)
+            
+            // Execute with our custom timeout wrapper
+            let (data, response) = try await withTimeoutForAnalysis(seconds: 140) {
+                try await session.data(for: request)
+            }
+            
+            print("🔧 GPT-5 Debug - Request succeeded on attempt \(attempt)")
+            return (data, response)
+            
+        } catch AIFoodAnalysisError.timeout {
+            print("⚠️ GPT-5 Debug - Timeout on attempt \(attempt)")
+            lastError = AIFoodAnalysisError.timeout
+            
+            if attempt < maxRetries {
+                let backoffDelay = Double(attempt) * 2.0  // 2s, 4s backoff
+                telemetryCallback?("⏳ GPT-5 retry in \(Int(backoffDelay))s...")
+                try await Task.sleep(nanoseconds: UInt64(backoffDelay * 1_000_000_000))
+            }
+        } catch {
+            print("❌ GPT-5 Debug - Non-timeout error on attempt \(attempt): \(error)")
+            // For non-timeout errors, fail immediately
+            throw error
+        }
+    }
+    
+    // All retries failed
+    print("❌ GPT-5 Debug - All retry attempts failed")
+    telemetryCallback?("❌ GPT-5 requests timed out, switching to GPT-4o...")
+    
+    // Auto-fallback to GPT-4o on persistent timeout
+    DispatchQueue.main.async {
+        UserDefaults.standard.useGPT5ForOpenAI = false
+    }
+    
+    throw AIFoodAnalysisError.customError("GPT-5 requests timed out consistently. Automatically switched to GPT-4o for reliability.")
+}
+
+/// Retry the request with GPT-4o after GPT-5 failure
+private func retryWithGPT4Fallback(_ image: UIImage, apiKey: String, query: String, 
+                                  analysisPrompt: String, isAdvancedPrompt: Bool, 
+                                  telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
+    
+    // Use GPT-4o model for fallback
+    let fallbackModel = "gpt-4o"
+    let compressionQuality: CGFloat = 0.85  // Standard compression for GPT-4
+    
+    guard let imageData = image.jpegData(compressionQuality: compressionQuality),
+          let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
+        throw AIFoodAnalysisError.imageProcessingFailed
+    }
+    
+    let base64Image = imageData.base64EncodedString()
+    
+    // Create GPT-4o request with appropriate timeouts
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    request.timeoutInterval = isAdvancedPrompt ? 150 : 30
+    
+    // Create GPT-4o payload
+    let finalPrompt = query.isEmpty ? analysisPrompt : "\(query)\n\n\(analysisPrompt)"
+    let payload: [String: Any] = [
+        "model": fallbackModel,
+        "max_tokens": isAdvancedPrompt ? 6000 : 2500,
+        "temperature": 0.01,
+        "messages": [
+            [
+                "role": "user",
+                "content": [
+                    [
+                        "type": "text",
+                        "text": finalPrompt
+                    ],
+                    [
+                        "type": "image_url",
+                        "image_url": [
+                            "url": "data:image/jpeg;base64,\(base64Image)",
+                            "detail": "high"
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
+    
+    request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+    
+    print("🔄 Fallback request: Using \(fallbackModel) with \(request.timeoutInterval)s timeout")
+    
+    // Execute GPT-4o request
+    let (data, response) = try await URLSession.shared.data(for: request)
+    
+    guard let httpResponse = response as? HTTPURLResponse else {
+        throw AIFoodAnalysisError.invalidResponse
+    }
+    
+    guard httpResponse.statusCode == 200 else {
+        throw AIFoodAnalysisError.apiError(httpResponse.statusCode)
+    }
+    
+    // Parse the response (reuse the existing parsing logic)
+    guard let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let choices = jsonResponse["choices"] as? [[String: Any]],
+          let firstChoice = choices.first,
+          let message = firstChoice["message"] as? [String: Any],
+          let content = message["content"] as? String else {
+        throw AIFoodAnalysisError.responseParsingFailed
+    }
+    
+    telemetryCallback?("✅ GPT-4o fallback successful!")
+    print("✅ GPT-4o fallback completed successfully")
+    
+    // Use the same parsing logic as the main function
+    return try parseOpenAIResponse(content: content)
+}
+
+/// Parse OpenAI response content into AIFoodAnalysisResult
+private func parseOpenAIResponse(content: String) throws -> AIFoodAnalysisResult {
+    // Helper functions for parsing
+    func extractString(from json: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = json[key] as? String, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return value.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        return nil
+    }
+    
+    func extractNumber(from json: [String: Any], keys: [String]) -> Double? {
+        for key in keys {
+            if let value = json[key] as? Double {
+                return value
+            } else if let value = json[key] as? Int {
+                return Double(value)
+            } else if let value = json[key] as? String, let doubleValue = Double(value) {
+                return doubleValue
+            }
+        }
+        return nil
+    }
+    
+    func extractConfidence(from json: [String: Any]) -> AIConfidenceLevel {
+        let confidenceKeys = ["confidence", "confidence_level", "accuracy"]
+        for key in confidenceKeys {
+            if let value = json[key] as? Double {
+                if value >= 0.8 { return .high }
+                else if value >= 0.6 { return .medium }
+                else { return .low }
+            } else if let value = json[key] as? String {
+                switch value.lowercased() {
+                case "high", "very high": return .high
+                case "medium", "moderate": return .medium
+                case "low", "very low": return .low
+                default: break
+                }
+            }
+        }
+        return .medium
+    }
+    
+    // Extract JSON from response
+    let cleanedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        .replacingOccurrences(of: "```json", with: "")
+        .replacingOccurrences(of: "```", with: "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    
+    // Find JSON boundaries
+    var jsonString: String
+    if let jsonStartRange = cleanedContent.range(of: "{"),
+       let jsonEndRange = cleanedContent.range(of: "}", options: .backwards),
+       jsonStartRange.lowerBound < jsonEndRange.upperBound {
+        jsonString = String(cleanedContent[jsonStartRange.lowerBound..<jsonEndRange.upperBound])
+    } else {
+        jsonString = cleanedContent
+    }
+    
+    guard let jsonData = jsonString.data(using: .utf8),
+          let nutritionData = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+        throw AIFoodAnalysisError.responseParsingFailed
+    }
+    
+    // Parse food items (simplified version)
+    var detailedFoodItems: [FoodItemAnalysis] = []
+    if let foodItemsArray = nutritionData["food_items"] as? [[String: Any]] {
+        for itemData in foodItemsArray {
+            let foodItem = FoodItemAnalysis(
+                name: extractString(from: itemData, keys: ["name"]) ?? "Unknown Food",
+                portionEstimate: extractString(from: itemData, keys: ["portion_estimate"]) ?? "1 serving",
+                usdaServingSize: extractString(from: itemData, keys: ["usda_serving_size"]),
+                servingMultiplier: max(0.1, extractNumber(from: itemData, keys: ["serving_multiplier"]) ?? 1.0),
+                preparationMethod: extractString(from: itemData, keys: ["preparation_method"]),
+                visualCues: extractString(from: itemData, keys: ["visual_cues"]),
+                carbohydrates: max(0, extractNumber(from: itemData, keys: ["carbohydrates"]) ?? 0),
+                calories: extractNumber(from: itemData, keys: ["calories"]).map { max(0, $0) },
+                fat: extractNumber(from: itemData, keys: ["fat"]).map { max(0, $0) },
+                fiber: extractNumber(from: itemData, keys: ["fiber"]).map { max(0, $0) },
+                protein: extractNumber(from: itemData, keys: ["protein"]).map { max(0, $0) },
+                assessmentNotes: extractString(from: itemData, keys: ["assessment_notes"])
+            )
+            detailedFoodItems.append(foodItem)
+        }
+    }
+    
+    // Extract totals and other fields
+    let totalCarbs = extractNumber(from: nutritionData, keys: ["total_carbohydrates"]) ?? 
+                    detailedFoodItems.reduce(0) { $0 + $1.carbohydrates }
+    let totalProtein = extractNumber(from: nutritionData, keys: ["total_protein"]) ?? 
+                      detailedFoodItems.compactMap { $0.protein }.reduce(0, +)
+    let totalFat = extractNumber(from: nutritionData, keys: ["total_fat"]) ?? 
+                  detailedFoodItems.compactMap { $0.fat }.reduce(0, +)
+    let totalFiber = extractNumber(from: nutritionData, keys: ["total_fiber"]) ??
+                    detailedFoodItems.compactMap { $0.fiber }.reduce(0, +)
+    let totalCalories = extractNumber(from: nutritionData, keys: ["total_calories"]) ?? 
+                       detailedFoodItems.compactMap { $0.calories }.reduce(0, +)
+    
+    let confidence = extractConfidence(from: nutritionData)
+    let originalServings = detailedFoodItems.reduce(0) { $0 + $1.servingMultiplier }
+    let absorptionHours = extractNumber(from: nutritionData, keys: ["absorption_time_hours"])
+    
+    return AIFoodAnalysisResult(
+        imageType: .foodPhoto,
+        foodItemsDetailed: detailedFoodItems,
+        overallDescription: extractString(from: nutritionData, keys: ["overall_description"]),
+        confidence: confidence,
+        totalFoodPortions: extractNumber(from: nutritionData, keys: ["total_food_portions"]).map { Int($0) },
+        totalUsdaServings: extractNumber(from: nutritionData, keys: ["total_usda_servings"]),
+        totalCarbohydrates: totalCarbs,
+        totalProtein: totalProtein > 0 ? totalProtein : nil,
+        totalFat: totalFat > 0 ? totalFat : nil,
+        totalFiber: totalFiber,
+        totalCalories: totalCalories > 0 ? totalCalories : nil,
+        portionAssessmentMethod: extractString(from: nutritionData, keys: ["portion_assessment_method"]),
+        diabetesConsiderations: extractString(from: nutritionData, keys: ["diabetes_considerations"]),
+        visualAssessmentDetails: extractString(from: nutritionData, keys: ["visual_assessment_details"]),
+        notes: "GPT-4o fallback analysis after GPT-5 timeout",
+        originalServings: originalServings,
+        fatProteinUnits: extractString(from: nutritionData, keys: ["fat_protein_units"]),
+        netCarbsAdjustment: extractString(from: nutritionData, keys: ["net_carbs_adjustment"]),
+        insulinTimingRecommendations: extractString(from: nutritionData, keys: ["insulin_timing_recommendations"]),
+        fpuDosingGuidance: extractString(from: nutritionData, keys: ["fpu_dosing_guidance"]),
+        exerciseConsiderations: extractString(from: nutritionData, keys: ["exercise_considerations"]),
+        absorptionTimeHours: absorptionHours,
+        absorptionTimeReasoning: extractString(from: nutritionData, keys: ["absorption_time_reasoning"]),
+        mealSizeImpact: extractString(from: nutritionData, keys: ["meal_size_impact"]),
+        individualizationFactors: extractString(from: nutritionData, keys: ["individualization_factors"]),
+        safetyAlerts: extractString(from: nutritionData, keys: ["safety_alerts"])
+    )
+}
+
 // MARK: - OpenAI Service (Alternative)
 
 class OpenAIFoodAnalysisService {
@@ -1645,8 +1986,75 @@ class OpenAIFoodAnalysisService {
         return try await analyzeFoodImage(image, apiKey: apiKey, query: query, telemetryCallback: nil)
     }
     
+    /// Create a GPT-5 optimized version of the comprehensive analysis prompt
+    private func createGPT5OptimizedPrompt(from fullPrompt: String) -> String {
+        // Extract whether this is advanced mode by checking the prompt content
+        let isAdvancedEnabled = fullPrompt.contains("fat_protein_units") || fullPrompt.contains("FPU")
+        
+        if isAdvancedEnabled {
+            // GPT-5 optimized prompt with advanced dosing fields
+            return """
+ADVANCED DIABETES ANALYSIS - JSON format required:
+{
+  "food_items": [{
+    "name": "specific_food_name",
+    "portion_estimate": "visual_portion_with_reference", 
+    "carbohydrates": grams,
+    "protein": grams,
+    "fat": grams,
+    "calories": kcal,
+    "fiber": grams,
+    "serving_multiplier": usda_serving_ratio
+  }],
+  "total_carbohydrates": sum_carbs,
+  "total_protein": sum_protein,
+  "total_fat": sum_fat, 
+  "total_fiber": sum_fiber,
+  "total_calories": sum_calories,
+  "portion_assessment_method": "explain_measurement_process",
+  "confidence": 0.0_to_1.0,
+  "overall_description": "visual_description",
+  "diabetes_considerations": "carb_sources_gi_timing",
+  "fat_protein_units": "calculate_FPU_equals_fat_plus_protein_divided_by_10",
+  "insulin_timing_recommendations": "meal_type_timing_bolus_strategy", 
+  "fpu_dosing_guidance": "extended_bolus_for_fat_protein",
+  "absorption_time_hours": hours_2_to_6,
+  "absorption_time_reasoning": "explain_absorption_timing"
+}
+
+Calculate FPU = (total_fat + total_protein) ÷ 10. Use visual references for portions.
+"""
+        } else {
+            // Standard GPT-5 prompt
+            return """
+DIABETES ANALYSIS - JSON format required:
+{
+  "food_items": [{
+    "name": "specific_food_name",
+    "portion_estimate": "visual_portion_with_reference", 
+    "carbohydrates": grams,
+    "protein": grams,
+    "fat": grams,
+    "calories": kcal,
+    "serving_multiplier": usda_serving_ratio
+  }],
+  "total_carbohydrates": sum_carbs,
+  "total_protein": sum_protein,
+  "total_fat": sum_fat, 
+  "total_calories": sum_calories,
+  "portion_assessment_method": "explain_measurement_process",
+  "confidence": 0.0_to_1.0,
+  "overall_description": "visual_description",
+  "diabetes_considerations": "carb_sources_and_timing"
+}
+
+Use visual references for portion estimates. Compare to USDA serving sizes.
+"""
+        }
+    }
+    
     func analyzeFoodImage(_ image: UIImage, apiKey: String, query: String, telemetryCallback: ((String) -> Void)?) async throws -> AIFoodAnalysisResult {
-        // OpenAI GPT-4 Vision implementation
+        // OpenAI GPT Vision implementation (GPT-5 or GPT-4o-mini)
         guard let url = URL(string: "https://api.openai.com/v1/chat/completions") else {
             throw AIFoodAnalysisError.invalidResponse
         }
@@ -1655,29 +2063,55 @@ class OpenAIFoodAnalysisService {
         telemetryCallback?("⚙️ Configuring OpenAI parameters...")
         let analysisMode = ConfigurableAIService.shared.analysisMode
         let model = ConfigurableAIService.optimalModel(for: .openAI, mode: analysisMode)
+        let gpt5Enabled = UserDefaults.standard.useGPT5ForOpenAI
+        
+        print("🤖 OpenAI Model Selection:")
+        print("   Analysis Mode: \(analysisMode.rawValue)")
+        print("   GPT-5 Enabled: \(gpt5Enabled)")
+        print("   Selected Model: \(model)")
         
         // Optimize image size for faster processing and uploads
         telemetryCallback?("🖼️ Optimizing your image...")
         let optimizedImage = ConfigurableAIService.optimizeImageForAnalysis(image)
         
-        // Convert image to base64 with adaptive compression
+        // Convert image to base64 with adaptive compression  
+        // GPT-5 benefits from more aggressive compression due to slower processing
         telemetryCallback?("🔄 Encoding image data...")
-        let compressionQuality = ConfigurableAIService.adaptiveCompressionQuality(for: optimizedImage)
+        let compressionQuality = model.contains("gpt-5") ? 
+            min(0.7, ConfigurableAIService.adaptiveCompressionQuality(for: optimizedImage)) :
+            ConfigurableAIService.adaptiveCompressionQuality(for: optimizedImage)
         guard let imageData = optimizedImage.jpegData(compressionQuality: compressionQuality) else {
             throw AIFoodAnalysisError.imageProcessingFailed
         }
         let base64Image = imageData.base64EncodedString()
         
-        // Create OpenAI API request
+        // Get analysis prompt early to check complexity
         telemetryCallback?("📡 Preparing API request...")
+        let analysisPrompt = getAnalysisPrompt()
+        let isAdvancedPrompt = analysisPrompt.count > 10000
+        
+        // Create OpenAI API request
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
-        let payload: [String: Any] = [
+        // Set appropriate timeout based on model type and prompt complexity
+        if model.contains("gpt-5") {
+            request.timeoutInterval = 120  // 2 minutes for GPT-5 models
+            print("🔧 GPT-5 Debug - Set URLRequest timeout to 120 seconds")
+        } else {
+            // For GPT-4 models, extend timeout significantly for advanced analysis (very long prompt)
+            request.timeoutInterval = isAdvancedPrompt ? 150 : 30  // 2.5 min for advanced, 30s for standard
+            print("🔧 GPT-4 Timeout - Model: \(model), Advanced: \(isAdvancedPrompt), Timeout: \(request.timeoutInterval)s, Prompt: \(analysisPrompt.count) chars")
+            if isAdvancedPrompt {
+                print("🔧 GPT-4 Advanced - Using extended 150s timeout for comprehensive analysis (\(analysisPrompt.count) chars)")
+            }
+        }
+        
+        // Use appropriate parameters based on model type
+        var payload: [String: Any] = [
             "model": model,
-            "temperature": 0.01,  // Minimal temperature for fastest, most direct responses
             "messages": [
                 [
                     "role": "user",
@@ -1685,8 +2119,21 @@ class OpenAIFoodAnalysisService {
                         [
                             "type": "text",
                             "text": {
-                                let analysisPrompt = getAnalysisPrompt()
-                                let finalPrompt = query.isEmpty ? analysisPrompt : "\(query)\n\n\(analysisPrompt)"
+                                // Use the pre-prepared analysis prompt
+                                let finalPrompt: String
+                                
+                                if model.contains("gpt-5") {
+                                    // For GPT-5, use the user's custom query if provided, otherwise use a simplified version of the main prompt
+                                    if !query.isEmpty {
+                                        finalPrompt = query
+                                    } else {
+                                        // Create a simplified version of the comprehensive prompt for GPT-5 performance
+                                        finalPrompt = createGPT5OptimizedPrompt(from: analysisPrompt)
+                                    }
+                                } else {
+                                    // For GPT-4, use full prompt system
+                                    finalPrompt = query.isEmpty ? analysisPrompt : "\(query)\n\n\(analysisPrompt)"
+                                }
                                 print("🔍 OpenAI Final Prompt Debug:")
                                 print("   Query isEmpty: \(query.isEmpty)")
                                 print("   Query length: \(query.count) characters")
@@ -1705,12 +2152,43 @@ class OpenAIFoodAnalysisService {
                         ]
                     ]
                 ]
-            ],
-            "max_tokens": 2500  // Optimized for faster responses while maintaining accuracy
+            ]
         ]
+        
+        // Configure parameters based on model type
+        if model.contains("gpt-5") {
+            // GPT-5 optimized parameters for better performance and reliability
+            payload["max_completion_tokens"] = 6000  // Reduced from 8000 for faster processing
+            // GPT-5 uses default temperature (1) - don't set custom temperature
+            // Add explicit response format for GPT-5
+            payload["response_format"] = [
+                "type": "json_object"
+            ]
+            // Add performance optimization for GPT-5
+            payload["stream"] = false  // Ensure complete response (no streaming)
+            telemetryCallback?("⚡ Using GPT-5 optimized settings...")
+        } else {
+            // GPT-4 models use max_tokens and support custom temperature
+            payload["max_tokens"] = isAdvancedPrompt ? 6000 : 2500  // Much more tokens for advanced analysis
+            payload["temperature"] = 0.01  // Minimal temperature for fastest, most direct responses
+            if isAdvancedPrompt {
+                print("🔧 GPT-4 Advanced - Using \(payload["max_tokens"]!) max_tokens for comprehensive analysis")
+            }
+        }
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+            
+            // Debug logging for GPT-5 requests
+            if model.contains("gpt-5") {
+                print("🔧 GPT-5 Debug - Request payload keys: \(payload.keys.sorted())")
+                if let bodyData = request.httpBody,
+                   let bodyString = String(data: bodyData, encoding: .utf8) {
+                    print("🔧 GPT-5 Debug - Request body length: \(bodyString.count) characters")
+                    print("🔧 GPT-5 Debug - Request contains image: \(bodyString.contains("image_url"))")
+                    print("🔧 GPT-5 Debug - Request contains response_format: \(bodyString.contains("response_format"))")
+                }
+            }
         } catch {
             throw AIFoodAnalysisError.requestCreationFailed
         }
@@ -1718,8 +2196,31 @@ class OpenAIFoodAnalysisService {
         telemetryCallback?("🌐 Sending request to OpenAI...")
         
         do {
-            telemetryCallback?("⏳ AI is cooking up results...")
-            let (data, response) = try await URLSession.shared.data(for: request)
+            if isAdvancedPrompt {
+                telemetryCallback?("⏳ Doing a deep analysis (may take a bit)...")
+            } else {
+                telemetryCallback?("⏳ AI is cooking up results...")
+            }
+            
+            // Use enhanced timeout logic with retry for GPT-5
+            let (data, response): (Data, URLResponse)
+            if model.contains("gpt-5") {
+                do {
+                    // GPT-5 requires special handling with retries and extended timeout
+                    (data, response) = try await performGPT5RequestWithRetry(request: request, telemetryCallback: telemetryCallback)
+                } catch let error as AIFoodAnalysisError where error.localizedDescription.contains("GPT-5 timeout") {
+                    // GPT-5 failed, immediately retry with GPT-4o
+                    print("🔄 Immediate fallback: Retrying with GPT-4o after GPT-5 failure")
+                    telemetryCallback?("🔄 Retrying with GPT-4o...")
+                    
+                    return try await retryWithGPT4Fallback(image, apiKey: apiKey, query: query, 
+                                                         analysisPrompt: analysisPrompt, isAdvancedPrompt: isAdvancedPrompt, 
+                                                         telemetryCallback: telemetryCallback)
+                }
+            } else {
+                // Standard GPT-4 processing
+                (data, response) = try await URLSession.shared.data(for: request)
+            }
             
             telemetryCallback?("📥 Received response from OpenAI...")
             
@@ -1728,6 +2229,17 @@ class OpenAIFoodAnalysisService {
                 throw AIFoodAnalysisError.invalidResponse
             }
             
+            
+            // Debug GPT-5 responses
+            if model.contains("gpt-5") {
+                print("🔧 GPT-5 Debug - HTTP Status: \(httpResponse.statusCode)")
+                print("🔧 GPT-5 Debug - Response headers: \(httpResponse.allHeaderFields)")
+                print("🔧 GPT-5 Debug - Response data length: \(data.count)")
+                
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("🔧 GPT-5 Debug - Raw response: \(responseString.prefix(500))...")
+                }
+            }
             
             guard httpResponse.statusCode == 200 else {
                 // Enhanced error logging for different status codes
@@ -1748,6 +2260,13 @@ class OpenAIFoodAnalysisService {
                             throw AIFoodAnalysisError.customError("Invalid OpenAI API key. Please check your configuration.")
                         } else if message.contains("usage") && message.contains("limit") {
                             throw AIFoodAnalysisError.quotaExceeded(provider: "OpenAI")
+                        } else if (message.contains("model") && message.contains("not found")) || message.contains("does not exist") {
+                            // Handle GPT-5 model not available - auto-fallback to GPT-4o
+                            if model.contains("gpt-5") && UserDefaults.standard.useGPT5ForOpenAI {
+                                print("⚠️ GPT-5 model not available, falling back to GPT-4o...")
+                                UserDefaults.standard.useGPT5ForOpenAI = false // Auto-disable GPT-5
+                                throw AIFoodAnalysisError.customError("GPT-5 not available yet. Switched to GPT-4o automatically. You can try enabling GPT-5 again later.")
+                            }
                         }
                     }
                 } else {
@@ -1807,6 +2326,23 @@ class OpenAIFoodAnalysisService {
             
             // Add detailed logging like Gemini
             print("🔧 OpenAI: Received content length: \(content.count)")
+            
+            // Check for empty content from GPT-5 and auto-fallback to GPT-4o
+            if content.count == 0 {
+                print("❌ OpenAI: Empty content received")
+                print("❌ OpenAI: Model used: \(model)")
+                print("❌ OpenAI: HTTP Status: \(httpResponse.statusCode)")
+                
+                if model.contains("gpt-5") && UserDefaults.standard.useGPT5ForOpenAI {
+                    print("⚠️ GPT-5 returned empty response, automatically switching to GPT-4o...")
+                    DispatchQueue.main.async {
+                        UserDefaults.standard.useGPT5ForOpenAI = false
+                    }
+                    throw AIFoodAnalysisError.customError("GPT-5 returned empty response. Automatically switched to GPT-4o for next analysis.")
+                }
+                
+                throw AIFoodAnalysisError.responseParsingFailed
+            }
             
             // Enhanced JSON extraction from GPT-4's response (like Claude service)
             telemetryCallback?("⚡ Processing AI analysis results...")
@@ -1981,7 +2517,7 @@ class OpenAIFoodAnalysisService {
                 portionAssessmentMethod: portionAssessmentMethod,
                 diabetesConsiderations: diabetesConsiderations,
                 visualAssessmentDetails: visualAssessmentDetails,
-                notes: "Analyzed using OpenAI GPT-4 Vision with detailed portion assessment",
+                notes: "Analyzed using OpenAI GPT Vision with detailed portion assessment",
                 originalServings: originalServings,
                 fatProteinUnits: extractString(from: nutritionData, keys: ["fat_protein_units"]),
                 netCarbsAdjustment: extractString(from: nutritionData, keys: ["net_carbs_adjustment"]),

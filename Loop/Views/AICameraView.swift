@@ -522,9 +522,9 @@ struct TelemetryWindow: View {
                 Spacer()
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .foregroundColor(.green)
-                    .font(.caption)
+                    .font(.caption2)
                 Text("Analysis Status")
-                    .font(.caption)
+                    .font(.caption2)
                     .fontWeight(.medium)
                     .foregroundColor(.secondary)
             }
@@ -539,7 +539,7 @@ struct TelemetryWindow: View {
                         ForEach(Array(logs.enumerated()), id: \.offset) { index, log in
                             HStack {
                                 Text(log)
-                                    .font(.system(.caption, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .foregroundColor(.primary)
                                     .multilineTextAlignment(.leading)
                                 Spacer()
