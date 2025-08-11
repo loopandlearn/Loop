@@ -361,7 +361,7 @@ struct AISettingsView: View {
                             Text("**Text/Voice Search:**")
                                 .font(.caption)
                                 .fontWeight(.bold)
-                            Text("USDA FoodData Central → OpenFoodFacts (Default)")
+                            Text("USDA FoodData Central → OpenFoodFacts")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
