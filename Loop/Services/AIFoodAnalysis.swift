@@ -229,7 +229,8 @@ FOR MENU AND RECIPE ITEMS:
 ❌ NEVER multiply nutrition values by assumed restaurant portion sizes
 
 ✅ ALWAYS set image_type to "menu_item" when analyzing menu text
-✅ ALWAYS set portion_estimate to "CANNOT DETERMINE - menu text only"
+✅ When analyzing a MENU, ALWAYS set portion_estimate to "CANNOT DETERMINE PORTION - menu text only"
+✅ When analyzing a RECIPE, ALWAYS set portion_estimate to "CANNOT DETERMINE PORTION - recipe text only"
 ✅ ALWAYS set serving_multiplier to 1.0 for menu items (USDA standard only)
 ✅ ALWAYS set visual_cues to "NONE - menu text analysis only"
 ✅ ALWAYS mark assessment_notes as "ESTIMATE ONLY - Based on USDA standard serving size"
@@ -471,7 +472,7 @@ FOR MENU ITEMS:
   "food_items": [
     {
       "name": "menu item name as written on menu",
-      "portion_estimate": "CANNOT DETERMINE - menu text only, no actual food visible",
+      "portion_estimate": "CANNOT DETERMINE PORTION - menu text only, no actual food visible",
       "usda_serving_size": "standard USDA serving size for this food type (e.g., '3 oz for chicken breast', '1/2 cup for cooked rice')",
       "serving_multiplier": 1.0,
       "preparation_method": "method described on menu (if any)",
@@ -514,7 +515,7 @@ If menu shows "Grilled Chicken Caesar Salad", respond:
   "food_items": [
     {
       "name": "Grilled Chicken Caesar Salad",
-      "portion_estimate": "CANNOT DETERMINE - menu text only, no actual food visible",
+      "portion_estimate": "CANNOT DETERMINE PORTION - menu text only, no actual food visible",
       "usda_serving_size": "3 oz chicken breast + 2 cups mixed greens",
       "serving_multiplier": 1.0,
       "preparation_method": "grilled chicken as described on menu",
@@ -556,7 +557,7 @@ If menu shows "Teriyaki Chicken Bowl with White Rice", respond:
   "food_items": [
     {
       "name": "Teriyaki Chicken with White Rice",
-      "portion_estimate": "CANNOT DETERMINE - menu text only, no actual food visible",
+      "portion_estimate": "CANNOT DETERMINE PORTION - menu text only, no actual food visible",
       "usda_serving_size": "3 oz chicken breast + 1/2 cup cooked white rice",
       "serving_multiplier": 1.0,
       "preparation_method": "teriyaki glazed chicken with steamed white rice as described on menu",
@@ -596,7 +597,7 @@ If menu shows "Quinoa Bowl with Sweet Potato and Black Beans", respond:
   "food_items": [
     {
       "name": "Quinoa Bowl with Sweet Potato and Black Beans",
-      "portion_estimate": "CANNOT DETERMINE - menu text only, no actual food visible",
+      "portion_estimate": "CANNOT DETERMINE PORTION - menu text only, no actual food visible",
       "usda_serving_size": "1/2 cup cooked quinoa + 1/2 cup sweet potato + 1/2 cup black beans",
       "serving_multiplier": 1.0,
       "preparation_method": "cooked quinoa, roasted sweet potato, and seasoned black beans as described on menu",
@@ -675,7 +676,8 @@ FOR MENU AND RECIPE ITEMS:
 ❌ NEVER multiply nutrition values by assumed restaurant portion sizes
 
 ✅ ALWAYS set image_type to "menu_item" when analyzing menu text
-✅ ALWAYS set portion_estimate to "CANNOT DETERMINE - menu text only"
+✅ When analyzing a MENU, ALWAYS set portion_estimate to "CANNOT DETERMINE PORTION - menu text only"
+✅ When analyzing a RECIPE, ALWAYS set portion_estimate to "CANNOT DETERMINE PORTION - recipe text only"
 ✅ ALWAYS set serving_multiplier to 1.0 for menu items (USDA standard only)
 ✅ ALWAYS set visual_cues to "NONE - menu text analysis only"
 ✅ ALWAYS mark assessment_notes as "ESTIMATE ONLY - Based on USDA standard serving size"
@@ -915,7 +917,7 @@ enum SearchProvider: String, CaseIterable {
     case claude = "Anthropic (Claude API)"
     case googleGemini = "Google (Gemini API)"
     case openAI = "OpenAI (ChatGPT API)"
-    case openFoodFacts = "OpenFoodFacts (Default)"
+    case openFoodFacts = "OpenFoodFacts"
     case usdaFoodData = "USDA FoodData Central"
     
     
