@@ -355,7 +355,7 @@ MANDATORY REQUIREMENTS:
     
     var textSearchProvider: String {
         get {
-            return string(forKey: Key.textSearchProvider.rawValue) ?? "OpenFoodFacts (Default)"
+            return string(forKey: Key.textSearchProvider.rawValue) ?? "USDA FoodData Central"
         }
         set {
             set(newValue, forKey: Key.textSearchProvider.rawValue)
@@ -364,7 +364,7 @@ MANDATORY REQUIREMENTS:
     
     var barcodeSearchProvider: String {
         get {
-            return string(forKey: Key.barcodeSearchProvider.rawValue) ?? "OpenFoodFacts (Default)"
+            return string(forKey: Key.barcodeSearchProvider.rawValue) ?? "OpenFoodFacts"
         }
         set {
             set(newValue, forKey: Key.barcodeSearchProvider.rawValue)
@@ -373,7 +373,7 @@ MANDATORY REQUIREMENTS:
     
     var aiImageProvider: String {
         get {
-            return string(forKey: Key.aiImageProvider.rawValue) ?? "Google (Gemini API)"
+            return string(forKey: Key.aiImageProvider.rawValue) ?? "OpenAI (ChatGPT API)"
         }
         set {
             set(newValue, forKey: Key.aiImageProvider.rawValue)
