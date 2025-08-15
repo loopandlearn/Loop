@@ -47,25 +47,22 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
     
     var body: some View {
         if isNewEntry {
-            GeometryReader { geometry in
-                NavigationView {
-                    let title = NSLocalizedString("carb-entry-title-add", value: "Add Carb Entry", comment: "The title of the view controller to create a new carb entry")
-                    content
-                        .navigationBarTitle(title, displayMode: .inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                dismissButton
-                            }
-                            
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                continueButton
-                            }
+            NavigationView {
+                let title = NSLocalizedString("carb-entry-title-add", value: "Add Carb Entry", comment: "The title of the view controller to create a new carb entry")
+                content
+                    .navigationBarTitle(title, displayMode: .inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            dismissButton
                         }
-                    
-                }
-                .navigationViewStyle(StackNavigationViewStyle())
-                .frame(width: geometry.size.width)
+                        
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            continueButton
+                        }
+                    }
+                
             }
+            .navigationViewStyle(StackNavigationViewStyle())
         } else {
             content
                 .toolbar {
