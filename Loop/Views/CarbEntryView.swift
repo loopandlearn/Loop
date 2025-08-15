@@ -47,22 +47,25 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
     
     var body: some View {
         if isNewEntry {
-            NavigationView {
-                let title = NSLocalizedString("carb-entry-title-add", value: "Add Carb Entry", comment: "The title of the view controller to create a new carb entry")
-                content
-                    .navigationBarTitle(title, displayMode: .inline)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            dismissButton
+            GeometryReader { geometry in
+                NavigationView {
+                    let title = NSLocalizedString("carb-entry-title-add", value: "Add Carb Entry", comment: "The title of the view controller to create a new carb entry")
+                    content
+                        .navigationBarTitle(title, displayMode: .inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                dismissButton
+                            }
+                            
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                continueButton
+                            }
                         }
-                        
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            continueButton
-                        }
-                    }
-                
+                    
+                }
+                .navigationViewStyle(StackNavigationViewStyle())
+                .frame(width: geometry.size.width)
             }
-            .navigationViewStyle(StackNavigationViewStyle())
         } else {
             content
                 .toolbar {
@@ -148,8 +151,32 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             let absorptionTimeFocused: Binding<Bool> = Binding(get: { expandedRow == .absorptionTime }, set: { expandedRow = $0 ? .absorptionTime : nil })
             
             CarbQuantityRow(quantity: $viewModel.carbsQuantity, isFocused: amountConsumedFocused, title: NSLocalizedString("Amount Consumed", comment: "Label for carb quantity entry row on carb entry screen"), preferredCarbUnit: viewModel.preferredCarbUnit)
+
+            CardSectionDivider()
             
-            // Food search section - moved up from bottom
+            DatePickerRow(date: $viewModel.time, isFocused: timerFocused, minimumDate: viewModel.minimumDate, maximumDate: viewModel.maximumDate)
+            
+            CardSectionDivider()
+            
+            FoodTypeRow(foodType: $viewModel.foodType, absorptionTime: $viewModel.absorptionTime, selectedDefaultAbsorptionTimeEmoji: $viewModel.selectedDefaultAbsorptionTimeEmoji, usesCustomFoodType: $viewModel.usesCustomFoodType, absorptionTimeWasEdited: $viewModel.absorptionTimeWasEdited, isFocused: foodTypeFocused, defaultAbsorptionTimes: viewModel.defaultAbsorptionTimes)
+            
+            CardSectionDivider()
+            
+            AIAbsorptionTimePickerRow(absorptionTime: $viewModel.absorptionTime, isFocused: absorptionTimeFocused, validDurationRange: viewModel.absorptionRimesRange, isAIGenerated: viewModel.absorptionTimeWasAIGenerated, showHowAbsorptionTimeWorks: $showHowAbsorptionTimeWorks)
+                .onReceive(viewModel.$absorptionTimeWasAIGenerated) { isAIGenerated in
+                    print("🎯 AIAbsorptionTimePickerRow received isAIGenerated: \(isAIGenerated)")
+                }
+                .padding(.bottom, 2)
+            
+            // Food Search enablement toggle (only show when Food Search is disabled)
+            if !isFoodSearchEnabled {
+                CardSectionDivider()
+                
+                FoodSearchEnableRow(isFoodSearchEnabled: $isFoodSearchEnabled)
+                    .padding(.bottom, 2)
+            }
+            
+            // Food search section - moved after Absorption Time
             if isNewEntry && isFoodSearchEnabled {
                 CardSectionDivider()
                 
@@ -213,11 +240,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                     viewModel.setupFoodSearchObservers()
                 }
                 
-                CardSectionDivider()
-            }
-            
-            // Food-related rows (only show if food search is enabled)
-            if isFoodSearchEnabled {
+                // Food-related rows (only show if food search is enabled)
                 // Always show servings row when food search is enabled
                 ServingsDisplayRow(
                     servings: $viewModel.numberOfServings, 
@@ -432,30 +455,6 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                     .padding(.vertical, 8)
                 }
             } // End food search enabled section
-
-            CardSectionDivider()
-            
-            DatePickerRow(date: $viewModel.time, isFocused: timerFocused, minimumDate: viewModel.minimumDate, maximumDate: viewModel.maximumDate)
-            
-            CardSectionDivider()
-            
-            FoodTypeRow(foodType: $viewModel.foodType, absorptionTime: $viewModel.absorptionTime, selectedDefaultAbsorptionTimeEmoji: $viewModel.selectedDefaultAbsorptionTimeEmoji, usesCustomFoodType: $viewModel.usesCustomFoodType, absorptionTimeWasEdited: $viewModel.absorptionTimeWasEdited, isFocused: foodTypeFocused, defaultAbsorptionTimes: viewModel.defaultAbsorptionTimes)
-            
-            CardSectionDivider()
-            
-            AIAbsorptionTimePickerRow(absorptionTime: $viewModel.absorptionTime, isFocused: absorptionTimeFocused, validDurationRange: viewModel.absorptionRimesRange, isAIGenerated: viewModel.absorptionTimeWasAIGenerated, showHowAbsorptionTimeWorks: $showHowAbsorptionTimeWorks)
-                .onReceive(viewModel.$absorptionTimeWasAIGenerated) { isAIGenerated in
-                    print("🎯 AIAbsorptionTimePickerRow received isAIGenerated: \(isAIGenerated)")
-                }
-                .padding(.bottom, 2)
-            
-            // Food Search enablement toggle (only show when Food Search is disabled)
-            if !isFoodSearchEnabled {
-                CardSectionDivider()
-                
-                FoodSearchEnableRow(isFoodSearchEnabled: $isFoodSearchEnabled)
-                    .padding(.bottom, 2)
-            }
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 12)
