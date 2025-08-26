@@ -100,13 +100,18 @@ struct BarcodeScannerView: View {
             // Clear any existing observers first to prevent duplicates
             cancellables.removeAll()
             
-            // Reset scanner service for a clean start if it has previous session state
-            if scannerService.hasExistingSession {
-                print("🎥 Scanner has existing session, performing reset...")
+            // Check if we can reuse existing session or need to reset
+            if scannerService.hasExistingSession && !scannerService.isScanning {
+                print("🎥 Scanner has existing session but not running, attempting quick restart...")
+                // Try to restart existing session first
+                scannerService.startScanning()
+                setupScannerAfterReset()
+            } else if scannerService.hasExistingSession {
+                print("🎥 Scanner has existing session and is running, performing reset...")
                 scannerService.resetService()
                 
-                // Wait a moment for reset to complete before proceeding
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                // Wait a moment for reset to complete before proceeding (reduced delay)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     self.setupScannerAfterReset()
                 }
             } else {
@@ -130,9 +135,25 @@ struct BarcodeScannerView: View {
     // MARK: - Subviews
     
     private func scanningOverlay(geometry: GeometryProxy) -> some View {
-        // Calculate actual camera preview area considering aspect ratio
-        let cameraPreviewArea = calculateCameraPreviewArea(in: geometry)
-        let scanningFrameCenter = CGPoint(x: cameraPreviewArea.midX, y: cameraPreviewArea.midY)
+        // Calculate the actual camera preview area
+        let cameraPreviewArea = calculateActualCameraPreviewArea(geometry: geometry)
+        
+        // Position the cutout at the center of the actual camera preview
+        let cutoutCenter = CGPoint(
+            x: cameraPreviewArea.midX,
+            y: cameraPreviewArea.midY
+        )
+        
+        // Position the white frame with fine-tuning offset
+        let finetuneOffset: CGFloat = 0 // Adjust this value to fine-tune white frame positioning
+        let whiteFrameCenter = CGPoint(
+            x: cameraPreviewArea.midX,
+            y: cameraPreviewArea.midY - 55
+
+            // Positive values (like +10) move the frame DOWN
+            // Negative values (like -10) move the frame UP
+            
+        )
         
         return ZStack {
             // Full screen semi-transparent overlay with cutout
@@ -143,7 +164,7 @@ struct BarcodeScannerView: View {
                         .overlay(
                             Rectangle()
                                 .frame(width: 250, height: 150)
-                                .position(scanningFrameCenter)
+                                .position(cutoutCenter)
                                 .blendMode(.destinationOut)
                         )
                 )
@@ -179,7 +200,7 @@ struct BarcodeScannerView: View {
                         .animation(.spring(response: 0.5, dampingFraction: 0.6), value: scanningStage)
                 }
             }
-            .position(scanningFrameCenter)
+            .position(whiteFrameCenter)
             
             // Instructions at the bottom
             VStack {
@@ -211,42 +232,51 @@ struct BarcodeScannerView: View {
             }
         }
     }
-    
-    /// Calculate the actual camera preview area considering aspect ratio and resizeAspectFill
-    private func calculateCameraPreviewArea(in geometry: GeometryProxy) -> CGRect {
+
+    private func calculateActualCameraPreviewArea(geometry: GeometryProxy) -> CGRect {
         let screenSize = geometry.size
-        let screenAspectRatio = screenSize.width / screenSize.height
+        let safeAreaTop = geometry.safeAreaInsets.top
+        let safeAreaBottom = geometry.safeAreaInsets.bottom
         
-        // Standard camera aspect ratio (4:3 for most phone cameras)
+        // Account for the top navigation area (Cancel/Retry buttons)
+        let topNavigationHeight: CGFloat = 44 + safeAreaTop
+        
+        // Account for bottom instruction area
+        let bottomInstructionHeight: CGFloat = 120 + safeAreaBottom
+        
+        // Available height for camera preview
+        let availableHeight = screenSize.height - topNavigationHeight - bottomInstructionHeight
+        let availableWidth = screenSize.width
+        
+        // Camera typically uses 4:3 aspect ratio
         let cameraAspectRatio: CGFloat = 4.0 / 3.0
+        let availableAspectRatio = availableWidth / availableHeight
         
-        // With resizeAspectFill, the camera preview fills the entire screen
-        // but may be cropped to maintain aspect ratio
-        if screenAspectRatio > cameraAspectRatio {
-            // Screen is wider than camera - camera preview fills height, crops width
-            let previewHeight = screenSize.height
-            let previewWidth = previewHeight * cameraAspectRatio
-            let xOffset = (screenSize.width - previewWidth) / 2
-            
-            return CGRect(
+        let cameraRect: CGRect
+        
+        if availableAspectRatio > cameraAspectRatio {
+            // Screen is wider than camera - camera will be letterboxed horizontally
+            let cameraWidth = availableHeight * cameraAspectRatio
+            let xOffset = (availableWidth - cameraWidth) / 2
+            cameraRect = CGRect(
                 x: xOffset,
-                y: 0,
-                width: previewWidth,
-                height: previewHeight
+                y: topNavigationHeight,
+                width: cameraWidth,
+                height: availableHeight
             )
         } else {
-            // Screen is taller than camera - camera preview fills width, crops height
-            let previewWidth = screenSize.width
-            let previewHeight = previewWidth / cameraAspectRatio
-            let yOffset = (screenSize.height - previewHeight) / 2
-            
-            return CGRect(
+            // Screen is taller than camera - camera will be letterboxed vertically
+            let cameraHeight = availableWidth / cameraAspectRatio
+            let yOffset = topNavigationHeight + (availableHeight - cameraHeight) / 2
+            cameraRect = CGRect(
                 x: 0,
                 y: yOffset,
-                width: previewWidth,
-                height: previewHeight
+                width: availableWidth,
+                height: cameraHeight
             )
         }
+        
+        return cameraRect
     }
     
     

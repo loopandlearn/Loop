@@ -83,7 +83,7 @@ struct AISettingsView: View {
                 // GPT-5 Feature Section - Only show when OpenAI is selected for AI Image Analysis
                 if aiService.aiImageSearchProvider.rawValue.contains("OpenAI") {
                     Section(header: Text("OpenAI GPT-5 (Latest)"), 
-                           footer: Text("Enable GPT-5, GPT-5-mini, and GPT-5-nano models for OpenAI analysis. Standard Quality uses GPT-5, Fast Mode uses GPT-5-nano for ultra-fast analysis. GPT-5 takes longer to perform analysis but these are the latest models with significant improvements in health advisory accuracy. Fallback to GPT-4o if unavailable.")) {
+                           footer: Text("Enable GPT-5, GPT-5-mini, and GPT-5-nano models for OpenAI analysis. Standard Quality uses GPT-5, Fast Mode uses GPT-5-nano for ultra-fast analysis. GPT-5 takes longer to perform analysis but these are the latest models with some improvements in health advisory accuracy. Fallback to GPT-4o if unavailable.")) {
                         Toggle("Use GPT-5 Models", isOn: $useGPT5ForOpenAI)
                             .disabled(!foodSearchEnabled)
                             .onChange(of: useGPT5ForOpenAI) { _ in
