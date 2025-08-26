@@ -408,37 +408,37 @@ struct ImagePicker: UIViewControllerRepresentable {
         overlayView.backgroundColor = UIColor.clear
         overlayView.translatesAutoresizingMaskIntoConstraints = false
         
-        // Create photo tips container (at the top)
+        // Create photo tips container (positioned at bottom to avoid viewfinder interference)
         let tipsContainer = UIView()
         tipsContainer.backgroundColor = UIColor.black.withAlphaComponent(0.75)
         tipsContainer.layer.cornerRadius = 12
         tipsContainer.translatesAutoresizingMaskIntoConstraints = false
         
-        // Create tips text
+        // Create tips text (simplified to prevent taking too much space)
         let tipsLabel = UILabel()
-        tipsLabel.text = "📸 For best AI analysis:\n• Take photos directly overhead\n• Include a fork or coin for size\n• Use good lighting - avoid shadows\n• Fill the frame with your food"
+        tipsLabel.text = "📸 Tips: Take overhead photos • Include size reference • Good lighting"
         tipsLabel.textColor = UIColor.white
-        tipsLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-        tipsLabel.numberOfLines = 0
-        tipsLabel.textAlignment = .left
+        tipsLabel.font = UIFont.systemFont(ofSize: 13, weight: .medium)
+        tipsLabel.numberOfLines = 2
+        tipsLabel.textAlignment = .center
         tipsLabel.translatesAutoresizingMaskIntoConstraints = false
         
         // Add views to overlay
         overlayView.addSubview(tipsContainer)
         tipsContainer.addSubview(tipsLabel)
         
-        // Set up constraints
+        // Set up constraints - position tips at bottom to avoid interfering with viewfinder
         NSLayoutConstraint.activate([
-            // Tips container at top
-            tipsContainer.topAnchor.constraint(equalTo: overlayView.safeAreaLayoutGuide.topAnchor, constant: 20),
+            // Tips container at bottom, above the camera controls
+            tipsContainer.bottomAnchor.constraint(equalTo: overlayView.safeAreaLayoutGuide.bottomAnchor, constant: -120),
             tipsContainer.leadingAnchor.constraint(equalTo: overlayView.leadingAnchor, constant: 20),
             tipsContainer.trailingAnchor.constraint(equalTo: overlayView.trailingAnchor, constant: -20),
             
             // Tips label within container
-            tipsLabel.topAnchor.constraint(equalTo: tipsContainer.topAnchor, constant: 12),
+            tipsLabel.topAnchor.constraint(equalTo: tipsContainer.topAnchor, constant: 8),
             tipsLabel.leadingAnchor.constraint(equalTo: tipsContainer.leadingAnchor, constant: 12),
             tipsLabel.trailingAnchor.constraint(equalTo: tipsContainer.trailingAnchor, constant: -12),
-            tipsLabel.bottomAnchor.constraint(equalTo: tipsContainer.bottomAnchor, constant: -12)
+            tipsLabel.bottomAnchor.constraint(equalTo: tipsContainer.bottomAnchor, constant: -8)
         ])
         
         // Set overlay as camera overlay
