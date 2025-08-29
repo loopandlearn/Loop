@@ -31,6 +31,7 @@ extension UserDefaults {
         case foodSearchEnabled = "com.loopkit.Loop.foodSearchEnabled"
         case advancedDosingRecommendationsEnabled = "com.loopkit.Loop.advancedDosingRecommendationsEnabled"
         case useGPT5ForOpenAI = "com.loopkit.Loop.useGPT5ForOpenAI"
+        case favoriteFoodImageIDs = "com.loopkit.Loop.favoriteFoodImageIDs"
     }
 
     var legacyPumpManagerRawValue: PumpManager.RawValue? {
@@ -413,6 +414,16 @@ MANDATORY REQUIREMENTS:
         }
         set {
             set(newValue, forKey: Key.useGPT5ForOpenAI.rawValue)
+        }
+    }
+
+    // Mapping of FavoriteFood.id -> image identifier (filename in image store)
+    var favoriteFoodImageIDs: [String: String] {
+        get {
+            return dictionary(forKey: Key.favoriteFoodImageIDs.rawValue) as? [String: String] ?? [:]
+        }
+        set {
+            set(newValue, forKey: Key.favoriteFoodImageIDs.rawValue)
         }
     }
 }

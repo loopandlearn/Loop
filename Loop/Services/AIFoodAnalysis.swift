@@ -703,6 +703,8 @@ struct FoodItemAnalysis {
     let fiber: Double?
     let protein: Double?
     let assessmentNotes: String?
+    // Optional per-item absorption time (hours) if provided by the AI
+    let absorptionTimeHours: Double?
 }
 
 /// Type of image being analyzed
@@ -1924,7 +1926,11 @@ private func parseOpenAIResponse(content: String) throws -> AIFoodAnalysisResult
                 fat: extractNumber(from: itemData, keys: ["fat"]).map { max(0, $0) },
                 fiber: extractNumber(from: itemData, keys: ["fiber"]).map { max(0, $0) },
                 protein: extractNumber(from: itemData, keys: ["protein"]).map { max(0, $0) },
-                assessmentNotes: extractString(from: itemData, keys: ["assessment_notes"])
+                assessmentNotes: extractString(from: itemData, keys: ["assessment_notes"]),
+                absorptionTimeHours: {
+                    if let v = extractNumber(from: itemData, keys: ["absorption_time_hours"]) { return min(max(v, 0), 24) }
+                    return nil
+                }()
             )
             detailedFoodItems.append(foodItem)
         }
@@ -2407,7 +2413,8 @@ Use visual references for portion estimates. Compare to USDA serving sizes.
                                 fat: extractNumber(from: itemData, keys: ["fat"]).map { max(0, $0) }, // Bounds checking
                                 fiber: extractNumber(from: itemData, keys: ["fiber"]).map { max(0, $0) }, // Bounds checking
                                 protein: extractNumber(from: itemData, keys: ["protein"]).map { max(0, $0) }, // Bounds checking
-                                assessmentNotes: extractString(from: itemData, keys: ["assessment_notes"])
+                                assessmentNotes: extractString(from: itemData, keys: ["assessment_notes"]),
+                                absorptionTimeHours: nil
                             )
                             detailedFoodItems.append(foodItem)
                         } catch {
@@ -2440,7 +2447,8 @@ Use visual references for portion estimates. Compare to USDA serving sizes.
                     fat: totalFat,
                     fiber: totalFiber,
                     protein: totalProtein,
-                    assessmentNotes: "Legacy format - combined nutrition values"
+                    assessmentNotes: "Legacy format - combined nutrition values",
+                    absorptionTimeHours: nil
                 )
                 detailedFoodItems = [singleItem]
             }
@@ -2459,7 +2467,8 @@ Use visual references for portion estimates. Compare to USDA serving sizes.
                     fat: 10.0,
                     fiber: 5.0,
                     protein: 15.0,
-                    assessmentNotes: "Safe fallback nutrition estimate - please verify actual food for accuracy"
+                    assessmentNotes: "Safe fallback nutrition estimate - please verify actual food for accuracy",
+                    absorptionTimeHours: nil
                 )
                 detailedFoodItems = [fallbackItem]
             }
@@ -3161,7 +3170,11 @@ class GoogleGeminiFoodAnalysisService {
                                 fat: extractNumber(from: itemData, keys: ["fat"]),
                                 fiber: extractNumber(from: itemData, keys: ["fiber"]),
                                 protein: extractNumber(from: itemData, keys: ["protein"]),
-                                assessmentNotes: extractString(from: itemData, keys: ["assessment_notes"])
+                                assessmentNotes: extractString(from: itemData, keys: ["assessment_notes"]),
+                                absorptionTimeHours: {
+                                    if let v = extractNumber(from: itemData, keys: ["absorption_time_hours"]) { return min(max(v, 0), 24) }
+                                    return nil
+                                }()
                             )
                             detailedFoodItems.append(foodItem)
                         } catch {
@@ -3189,7 +3202,11 @@ class GoogleGeminiFoodAnalysisService {
                         fat: totalFat,
                         fiber: totalFiber,
                         protein: totalProtein,
-                        assessmentNotes: "Legacy format - combined nutrition values"
+                        assessmentNotes: "Legacy format - combined nutrition values",
+                        absorptionTimeHours: {
+                            if let v = extractNumber(from: nutritionData, keys: ["absorption_time_hours"]) { return min(max(v, 0), 24) }
+                            return nil
+                        }()
                     )
                     detailedFoodItems = [singleItem]
                 }
@@ -3211,7 +3228,11 @@ class GoogleGeminiFoodAnalysisService {
                     fat: 10.0,
                     fiber: 5.0,
                     protein: 15.0,
-                    assessmentNotes: "Safe fallback nutrition estimate - check actual food for accuracy"
+                    assessmentNotes: "Safe fallback nutrition estimate - check actual food for accuracy",
+                    absorptionTimeHours: {
+                        if let v = extractNumber(from: nutritionData, keys: ["absorption_time_hours"]) { return min(max(v, 0), 24) }
+                        return nil
+                    }()
                 )
                 detailedFoodItems = [fallbackItem]
             }
@@ -3477,7 +3498,8 @@ class BasicFoodAnalysisService {
                 fat: estimateFat(for: selectedFood, portion: portionSize),
                 fiber: estimateFiber(for: selectedFood, portion: portionSize),
                 protein: estimateProtein(for: selectedFood, portion: portionSize),
-                assessmentNotes: "Basic estimate based on typical portions and common nutrition values. For diabetes management, monitor actual blood glucose response."
+                assessmentNotes: "Basic estimate based on typical portions and common nutrition values. For diabetes management, monitor actual blood glucose response.",
+                absorptionTimeHours: nil
             )
         ]
     }
@@ -3843,7 +3865,8 @@ class ClaudeFoodAnalysisService {
                             fat: extractClaudeNumber(from: item, keys: ["fat"]).map { max(0, $0) }, // Bounds checking
                             fiber: extractClaudeNumber(from: item, keys: ["fiber"]).map { max(0, $0) }, // Bounds checking
                             protein: extractClaudeNumber(from: item, keys: ["protein"]).map { max(0, $0) }, // Bounds checking
-                            assessmentNotes: extractClaudeString(from: item, keys: ["assessment_notes"])
+                            assessmentNotes: extractClaudeString(from: item, keys: ["assessment_notes"]),
+                            absorptionTimeHours: nil
                         )
                         foodItems.append(foodItem)
                     } catch {
@@ -3877,7 +3900,8 @@ class ClaudeFoodAnalysisService {
                     fat: totalFat.map { max(0, $0) }, // Bounds checking
                     fiber: totalFiber.map { max(0, $0) },
                     protein: totalProtein.map { max(0, $0) }, // Bounds checking
-                    assessmentNotes: "Safe fallback nutrition estimate - please verify actual food for accuracy"
+                    assessmentNotes: "Safe fallback nutrition estimate - please verify actual food for accuracy",
+                    absorptionTimeHours: nil
                 )
             ]
         }
