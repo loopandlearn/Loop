@@ -153,6 +153,8 @@ final class CarbEntryViewModel: ObservableObject {
     
     /// Store the last AI analysis result for detailed UI display
     @Published var lastAIAnalysisResult: AIFoodAnalysisResult? = nil
+    /// Indices of AI-detected items excluded by the user (soft delete)
+    @Published var excludedAIItemIndices: Set<Int> = []
     
     /// Store the captured AI image for display
     @Published var capturedAIImage: UIImage? = nil
@@ -197,6 +199,7 @@ final class CarbEntryViewModel: ObservableObject {
         observeFavoriteFoodIndexChange()
         observeLoopUpdates()
         observeNumberOfServingsChange()
+        observeAIExclusionsChange()
         setupFoodSearchObservers()
     }
     
@@ -219,6 +222,7 @@ final class CarbEntryViewModel: ObservableObject {
         observeFavoriteFoodIndexChange()
         observeLoopUpdates()
         observeNumberOfServingsChange()
+        observeAIExclusionsChange()
         setupFoodSearchObservers()
     }
     
@@ -323,6 +327,29 @@ final class CarbEntryViewModel: ObservableObject {
         // Explicitly persist to avoid race with other view models' sinks
         UserDefaults.standard.writeFavoriteFoods(favoriteFoods)
         selectedFavoriteFoodIndex = favoriteFoods.count - 1
+
+        // Save thumbnail if we have an AI-captured image
+        if let image = capturedAIImage {
+            if let id = FavoriteFoodImageStore.saveThumbnail(from: image) {
+                var map = UserDefaults.standard.favoriteFoodImageIDs
+                map[newStoredFood.id] = id
+                UserDefaults.standard.favoriteFoodImageIDs = map
+            }
+        } else if let product = selectedFoodProduct {
+            // Attempt to fetch a thumbnail from product image URLs (text/barcode flows)
+            let urlStrings: [String] = [product.imageFrontURL, product.imageURL].compactMap { $0 }
+            if let firstURLString = urlStrings.first, let firstURL = URL(string: firstURLString) {
+                Task {
+                    if let thumb = await ImageDownloader.fetchThumbnail(from: firstURL) {
+                        if let id = FavoriteFoodImageStore.saveThumbnail(from: thumb) {
+                            var map = UserDefaults.standard.favoriteFoodImageIDs
+                            map[newStoredFood.id] = id
+                            UserDefaults.standard.favoriteFoodImageIDs = map
+                        }
+                    }
+                }
+            }
+        }
     }
     
     private func observeFavoriteFoodIndexChange() {
@@ -450,8 +477,44 @@ final class CarbEntryViewModel: ObservableObject {
             .sink { [weak self] servings in
                 print("🥄 numberOfServings changed to: \(servings), recalculating nutrition...")
                 self?.recalculateCarbsForServings(servings)
+                self?.recomputeAIAdjustments()
             }
             .store(in: &cancellables)
+    }
+
+    private func observeAIExclusionsChange() {
+        $excludedAIItemIndices
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.recomputeAIAdjustments()
+            }
+            .store(in: &cancellables)
+        $lastAIAnalysisResult
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.recomputeAIAdjustments()
+            }
+            .store(in: &cancellables)
+    }
+
+    // Recompute carbs and absorption time based on included AI items
+    func recomputeAIAdjustments() {
+        guard let ai = lastAIAnalysisResult else { return }
+        let included = ai.foodItemsDetailed.enumerated()
+            .filter { !excludedAIItemIndices.contains($0.offset) }
+            .map { $0.element }
+        // Carbs
+        let baseCarbs = included.reduce(0.0) { $0 + $1.carbohydrates }
+        let scale = ai.originalServings > 0 ? (numberOfServings / ai.originalServings) : 1.0
+        let newCarbs = baseCarbs * scale
+        self.carbsQuantity = newCarbs
+
+        // Absorption time: use overall AI time if present (per-item times not available)
+        if let hours = ai.absorptionTimeHours, hours > 0 {
+            self.absorptionEditIsProgrammatic = true
+            self.absorptionTime = TimeInterval(hours * 3600)
+            self.absorptionTimeWasAIGenerated = true
+        }
     }
 }
 
@@ -1592,7 +1655,8 @@ extension CarbEntryViewModel {
             fat: fat,
             fiber: nil,
             protein: protein,
-            assessmentNotes: "Text-based nutrition lookup using Google Gemini"
+            assessmentNotes: "Text-based nutrition lookup using Google Gemini",
+            absorptionTimeHours: nil
         )
         
         return AIFoodAnalysisResult(

@@ -297,14 +297,32 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                             }
                         }
                         
-                        // Product name (shortened)
-                        Text(shortenedTitle(selectedFood.displayName))
-                            .font(.headline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.primary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(1)
-                        
+                        // Product name with favorite heart (centered as a unit)
+                        ZStack {
+                            // Centered content
+                            HStack(spacing: 8) {
+                                Text(shortenedTitle(selectedFood.displayName))
+                                    .font(.headline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Button(action: { toggleQuickFavorite(for: selectedFood) }) {
+                                    Image(systemName: isQuickFavorited(selectedFood) ? "heart.fill" : "heart")
+                                        .foregroundColor(isQuickFavorited(selectedFood) ? .red : Color(UIColor.tertiaryLabel))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .center)
+
+                            // Invisible spacers to balance left/right so ZStack centers correctly
+                            HStack {
+                                Color.clear.frame(width: 1)
+                                Spacer()
+                                Color.clear.frame(width: 1)
+                            }
+                        }
+                    
                         // Package serving size (only show "Package Serving Size:" prefix for barcode scans)
                         Text(selectedFood.dataSource == .barcodeScan ? "Package Serving Size: \(selectedFood.servingSizeDisplay)" : selectedFood.servingSizeDisplay)
                             .font(.subheadline)
@@ -326,29 +344,18 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                                 // Use AI analysis result if available, otherwise fall back to selected food
                                 let aiResult = viewModel.lastAIAnalysisResult
                                 
-                                let (carbsValue, caloriesValue, fatValue, fiberValue, proteinValue): (Double, Double?, Double?, Double?, Double?) = {
-                                    if let aiResult = aiResult {
-                                        // For AI results: scale by current servings vs original baseline servings
-                                        // This ensures both food deletion and serving adjustments work correctly
-                                        let servingScale = viewModel.numberOfServings / aiResult.originalServings
-                                        return (
-                                            aiResult.totalCarbohydrates * servingScale,
-                                            aiResult.totalCalories.map { $0 * servingScale },
-                                            aiResult.totalFat.map { $0 * servingScale },
-                                            aiResult.totalFiber.map { $0 * servingScale },
-                                            aiResult.totalProtein.map { $0 * servingScale }
-                                        )
-                                    } else {
-                                        // For database foods: scale per-serving values by number of servings
-                                        return (
-                                            (selectedFood.carbsPerServing ?? selectedFood.nutriments.carbohydrates) * viewModel.numberOfServings,
-                                            selectedFood.caloriesPerServing.map { $0 * viewModel.numberOfServings },
-                                            selectedFood.fatPerServing.map { $0 * viewModel.numberOfServings },
-                                            selectedFood.fiberPerServing.map { $0 * viewModel.numberOfServings },
-                                            selectedFood.proteinPerServing.map { $0 * viewModel.numberOfServings }
-                                        )
-                                    }
-                                }()
+                                // Precompute nutrient values outside of ViewBuilder heavy logic
+                                let valuesTuple = computeDisplayedMacros(
+                                    selectedFood: selectedFood,
+                                    aiResult: aiResult,
+                                    numberOfServings: viewModel.numberOfServings,
+                                    excluded: viewModel.excludedAIItemIndices
+                                )
+                                let carbsValue = valuesTuple.carbs
+                                let caloriesValue = valuesTuple.calories
+                                let fatValue = valuesTuple.fat
+                                let fiberValue = valuesTuple.fiber
+                                let proteinValue = valuesTuple.protein
                                 
                                 // Carbohydrates (first)
                                 NutritionCircle(
@@ -407,6 +414,23 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                         }
                         .frame(height: 90) // Increased height to prevent clipping
                         .id("nutrition-circles-\(viewModel.numberOfServings)")
+                        
+                        // Confidence line (AI only)
+                        Group {
+                            if let ai = viewModel.lastAIAnalysisResult {
+                                let pct = computeConfidencePercent(from: ai, servings: viewModel.numberOfServings)
+                                HStack(spacing: 6) {
+                                    Text("Confidence:")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text("\(pct)%")
+                                        .font(.caption)
+                                        .foregroundColor(confidenceColor(pct))
+                                        .blendMode(.normal)
+                                }
+                                .padding(.top, 2)
+                            }
+                        }
                     }
                     .padding(.vertical, 8)
                     .padding(.horizontal, 8)
@@ -426,11 +450,13 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                         
                         // Portion estimation method (expandable)
                         if let portionMethod = aiResult.portionAssessmentMethod, !portionMethod.isEmpty {
+                            // Confidence line inside the Portions & Servings expandable
+                            let pct = computeConfidencePercent(from: aiResult, servings: viewModel.numberOfServings)
                             ExpandableNoteView(
                                 icon: "ruler",
                                 iconColor: .blue,
                                 title: "Portions & Servings:",
-                                content: portionMethod,
+                                content: portionMethod + "\n\nConfidence: \(pct)%",
                                 backgroundColor: Color(.systemBlue).opacity(0.08)
                             )
                         }
@@ -438,7 +464,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                         // Diabetes considerations (expandable)
                         if let diabetesNotes = aiResult.diabetesConsiderations, !diabetesNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             ExpandableNoteView(
-                                icon: "heart.fill",
+                                icon: "drop.fill",
                                 iconColor: .red,
                                 title: "Diabetes Note:",
                                 content: diabetesNotes,
@@ -881,6 +907,55 @@ extension CarbEntryView {
 
 // MARK: - Other UI Elements
 extension CarbEntryView {
+    // Quick favorite helpers
+    private func isQuickFavorited(_ product: OpenFoodFactsProduct) -> Bool {
+        let existing = viewModel.favoriteFoods
+        // Consider a match by name + foodType when present
+        let name = product.displayName
+        return existing.contains { $0.name == name }
+    }
+
+    private func toggleQuickFavorite(for product: OpenFoodFactsProduct) {
+        if isQuickFavorited(product) {
+            // Already exists: do nothing for now (could navigate to favorites)
+            return
+        }
+        // Build a NewFavoriteFood using current carbs, foodType, and absorption time
+        let carbs = viewModel.carbsQuantity ?? 0
+        guard carbs > 0 else { return }
+        let new = NewFavoriteFood(
+            name: product.displayName,
+            carbsQuantity: HKQuantity(unit: viewModel.preferredCarbUnit, doubleValue: carbs),
+            foodType: viewModel.foodType,
+            absorptionTime: viewModel.absorptionTime
+        )
+        viewModel.onFavoriteFoodSave(new)
+    }
+
+    // Confidence helpers
+    private func computeConfidencePercent(from ai: AIFoodAnalysisResult, servings: Double) -> Int {
+        // Map AIConfidenceLevel to a baseline percent
+        let base: Double = {
+            switch ai.confidence {
+            case .high: return 0.85
+            case .medium: return 0.65
+            case .low: return 0.4
+            }
+        }()
+        var score: Double = 60
+        if ai.totalCarbohydrates > 0 { score += 10 }
+        if servings > 0, servings < 0.95 { score += 10 }
+        if !ai.foodItemsDetailed.isEmpty { score += 10 }
+        // Blend base with heuristic bump
+        let blended = min(0.95, max(0.0, base + (score - 60)/100.0))
+        return Int((blended * 100).rounded())
+    }
+    
+    private func confidenceColor(_ percent: Int) -> Color {
+        if percent < 40 { return .red }
+        if percent < 75 { return .yellow }
+        return .green
+    }
     private var dismissButton: some View {
         Button(action: dismiss) {
             Text("Cancel")
@@ -1116,7 +1191,9 @@ extension CarbEntryView {
                 
                 Spacer()
                 
-                Text("(\(aiResult.foodItemsDetailed.count) items)")
+                let excludedCount = viewModel.excludedAIItemIndices.count
+                let includedCount = max(0, aiResult.foodItemsDetailed.count - excludedCount)
+                Text("(\(includedCount) of \(aiResult.foodItemsDetailed.count) items)")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
@@ -1138,13 +1215,15 @@ extension CarbEntryView {
             if expandedRow == .detailedFoodBreakdown {
                 VStack(spacing: 12) {
                     ForEach(Array(aiResult.foodItemsDetailed.enumerated()), id: \.offset) { index, foodItem in
-                        FoodItemDetailRow(
-                            foodItem: foodItem, 
-                            itemNumber: index + 1,
-                            onDelete: {
-                                viewModel.deleteFoodItem(at: index)
-                            }
-                        )
+                        // Card-style row with light gray boundary
+                        VStack { renderAIItemRow(index: index, item: foodItem) }
+                            .padding(12)
+                            .background(Color(.systemGray6))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(.separator).opacity(0.5), lineWidth: 1)
+                            )
                     }
                 }
                 .padding(.horizontal, 8)
@@ -1157,6 +1236,131 @@ extension CarbEntryView {
                 )
                 .padding(.top, 4)
             }
+        }
+    }
+
+    // Small macro badge helper
+    private func miniMacro(_ label: String, _ value: Double) -> some View {
+        VStack(spacing: 2) {
+            Text("\(Int(round(value)))")
+                .font(.caption2)
+                .foregroundColor(.primary)
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding(6)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    // Extracted row view to simplify ViewBuilder
+    @ViewBuilder
+    private func renderAIItemRow(index: Int, item: FoodItemAnalysis) -> some View {
+        let isExcluded = viewModel.excludedAIItemIndices.contains(index)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 8) {
+                Text("\(index + 1).")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Text(item.name)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isExcluded ? .secondary : .primary)
+                    .strikethrough(isExcluded, color: .secondary)
+                Spacer()
+                // Carbs with subtle gray background for contrast
+                Text("\(String(format: "%.1f", item.carbohydrates)) g carbs")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(Color(.systemGray5))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                Button(action: {
+                    if isExcluded { viewModel.excludedAIItemIndices.remove(index) }
+                    else { viewModel.excludedAIItemIndices.insert(index) }
+                    viewModel.recomputeAIAdjustments()
+                }) {
+                    Image(systemName: isExcluded ? "plus.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(isExcluded ? .green : .red)
+                        .font(.system(size: 18, weight: .medium))
+                }
+                .buttonStyle(.plain)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Portion I See:")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                Text(item.portionEstimate.isEmpty ? "Unknown portion" : item.portionEstimate)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if let usda = item.usdaServingSize, !usda.isEmpty {
+                    HStack(spacing: 6) {
+                        Text("Normal USDA Serving:")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        Text(usda)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+                if viewModel.numberOfServings > 0, let ai = viewModel.lastAIAnalysisResult, ai.originalServings > 0 {
+                    let mult = viewModel.numberOfServings / ai.originalServings
+                    if abs(mult - 1.0) > 0.01 {
+                        HStack(spacing: 6) {
+                            Text("Normal USDA Serving:")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                            Text("(×\(String(format: "%.1f", mult)))")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                }
+            }
+            .foregroundColor(isExcluded ? .secondary : .primary)
+            .opacity(isExcluded ? 0.7 : 1.0)
+            
+            HStack(spacing: 18) {
+                VStack(spacing: 0) { Text("\(Int(round(item.calories ?? 0)))").foregroundColor(.green); Text("cal").font(.caption).foregroundColor(.secondary) }
+                VStack(spacing: 0) { Text(String(format: "%.1f", item.fat ?? 0)).foregroundColor(Color.orange); Text("fat").font(.caption).foregroundColor(.secondary) }
+                VStack(spacing: 0) { Text(String(format: "%.1f", item.fiber ?? 0)).foregroundColor(Color.purple); Text("fiber").font(.caption).foregroundColor(.secondary) }
+                VStack(spacing: 0) { Text(String(format: "%.1f", item.protein ?? 0)).foregroundColor(.red); Text("protein").font(.caption).foregroundColor(.secondary) }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .opacity(isExcluded ? 0.25 : 1.0)
+        }
+    }
+
+    // Compute displayed macro values for circles
+    private func computeDisplayedMacros(selectedFood: OpenFoodFactsProduct, aiResult: AIFoodAnalysisResult?, numberOfServings: Double, excluded: Set<Int>) -> (carbs: Double, calories: Double?, fat: Double?, fiber: Double?, protein: Double?) {
+        if let ai = aiResult {
+            let servingScale = numberOfServings / ai.originalServings
+            let included = ai.foodItemsDetailed.enumerated().filter { !excluded.contains($0.offset) }.map { $0.element }
+            let carbs = included.reduce(0.0) { $0 + $1.carbohydrates } * servingScale
+            let caloriesSum = included.compactMap { $0.calories }.reduce(0.0, +)
+            let fatSum = included.compactMap { $0.fat }.reduce(0.0, +)
+            let fiberSum = included.compactMap { $0.fiber }.reduce(0.0, +)
+            let proteinSum = included.compactMap { $0.protein }.reduce(0.0, +)
+            let cals: Double? = caloriesSum > 0 ? caloriesSum * servingScale : nil
+            let fat: Double? = fatSum > 0 ? fatSum * servingScale : nil
+            let fiber: Double? = fiberSum > 0 ? fiberSum * servingScale : nil
+            let protein: Double? = proteinSum > 0 ? proteinSum * servingScale : nil
+            return (carbs, cals, fat, fiber, protein)
+        } else {
+            let carbs = (selectedFood.carbsPerServing ?? selectedFood.nutriments.carbohydrates) * numberOfServings
+            let cals = selectedFood.caloriesPerServing.map { $0 * numberOfServings }
+            let fat = selectedFood.fatPerServing.map { $0 * numberOfServings }
+            let fiber = selectedFood.fiberPerServing.map { $0 * numberOfServings }
+            let protein = selectedFood.proteinPerServing.map { $0 * numberOfServings }
+            return (carbs, cals, fat, fiber, protein)
         }
     }
 }
@@ -1549,28 +1753,28 @@ struct FoodItemDetailRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 if !foodItem.portionEstimate.isEmpty {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Portion:")
+                        Text("What I see:")
                             .font(.caption)
-                            .fontWeight(.medium)
+                            .fontWeight(.light)
                             .foregroundColor(.secondary)
                         Text(foodItem.portionEstimate)
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundColor(.primary)
                     }
                 }
                 
                 if let usdaSize = foodItem.usdaServingSize, !usdaSize.isEmpty {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("USDA Serving:")
+                        Text("USDA serving:")
                             .font(.caption)
-                            .fontWeight(.medium)
+                            .fontWeight(.light)
                             .foregroundColor(.secondary)
                         HStack {
                             Text(usdaSize)
                                 .font(.caption)
                                 .foregroundColor(.primary)
                             Text("(×\(String(format: "%.1f", foodItem.servingMultiplier)))")
-                                .font(.caption)
+                                .font(.caption2)
                                 .foregroundColor(.orange)
                         }
                     }

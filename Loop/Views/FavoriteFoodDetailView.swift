@@ -32,6 +32,23 @@ public struct FavoriteFoodDetailView: View {
     public var body: some View {
         if let food {
             List {
+                // Thumbnail (if available)
+                if let thumb = thumbnailForFood(food) {
+                    Section {
+                        Image(uiImage: thumb)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 160)
+                            .frame(maxWidth: .infinity)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color(.separator), lineWidth: 0.5)
+                            )
+                    }
+                    .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 0, trailing: 12))
+                }
                 Section("Information") {
                     VStack(spacing: 16) {
                         let rows: [(field: String, value: String)] = [
@@ -69,5 +86,14 @@ public struct FavoriteFoodDetailView: View {
             .insetGroupedListStyle()
             .navigationTitle(food.title)
         }
+    }
+}
+
+// MARK: - Thumbnail helper
+extension FavoriteFoodDetailView {
+    private func thumbnailForFood(_ food: StoredFavoriteFood) -> UIImage? {
+        let map = UserDefaults.standard.favoriteFoodImageIDs
+        guard let id = map[food.id] else { return nil }
+        return FavoriteFoodImageStore.loadThumbnail(id: id)
     }
 }

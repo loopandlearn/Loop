@@ -43,6 +43,8 @@ final class FavoriteFoodsViewModel: ObservableObject {
             // Explicitly persist after add
             UserDefaults.standard.writeFavoriteFoods(favoriteFoods)
             isAddViewActive = false
+            // Attempt to use any last AI image from carb entry context is not available here;
+            // List view additions do not capture images, so we skip thumbnail here.
         }
         else if var selectedFood, let selectedFooxIndex = favoriteFoods.firstIndex(of: selectedFood) {
             selectedFood.name = newFood.name
@@ -65,6 +67,13 @@ final class FavoriteFoodsViewModel: ObservableObject {
         }
         // Explicitly persist after delete
         UserDefaults.standard.writeFavoriteFoods(favoriteFoods)
+        // Remove thumbnail mapping and file if present
+        var map = UserDefaults.standard.favoriteFoodImageIDs
+        if let id = map[food.id] {
+            FavoriteFoodImageStore.deleteThumbnail(id: id)
+            map.removeValue(forKey: food.id)
+            UserDefaults.standard.favoriteFoodImageIDs = map
+        }
     }
 
     func onFoodReorder(from: IndexSet, to: Int) {
