@@ -40,6 +40,8 @@ final class FavoriteFoodsViewModel: ObservableObject {
             withAnimation {
                 favoriteFoods.append(newStoredFood)
             }
+            // Explicitly persist after add
+            UserDefaults.standard.writeFavoriteFoods(favoriteFoods)
             isAddViewActive = false
         }
         else if var selectedFood, let selectedFooxIndex = favoriteFoods.firstIndex(of: selectedFood) {
@@ -48,6 +50,8 @@ final class FavoriteFoodsViewModel: ObservableObject {
             selectedFood.foodType = newFood.foodType
             selectedFood.absorptionTime = newFood.absorptionTime
             favoriteFoods[selectedFooxIndex] = selectedFood
+            // Explicitly persist after edit
+            UserDefaults.standard.writeFavoriteFoods(favoriteFoods)
             isEditViewActive = false
         }
     }
@@ -59,12 +63,16 @@ final class FavoriteFoodsViewModel: ObservableObject {
         withAnimation {
             _ = favoriteFoods.remove(food)
         }
+        // Explicitly persist after delete
+        UserDefaults.standard.writeFavoriteFoods(favoriteFoods)
     }
 
     func onFoodReorder(from: IndexSet, to: Int) {
         withAnimation {
             favoriteFoods.move(fromOffsets: from, toOffset: to)
         }
+        // Explicitly persist after reorder
+        UserDefaults.standard.writeFavoriteFoods(favoriteFoods)
     }
     
     func addFoodTapped() {

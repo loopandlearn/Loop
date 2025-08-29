@@ -47,25 +47,22 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
     
     var body: some View {
         if isNewEntry {
-            GeometryReader { geometry in
-                NavigationView {
-                    let title = NSLocalizedString("carb-entry-title-add", value: "Add Carb Entry", comment: "The title of the view controller to create a new carb entry")
-                    content
-                        .navigationBarTitle(title, displayMode: .inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                dismissButton
-                            }
-                            
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                continueButton
-                            }
+            NavigationView {
+                let title = NSLocalizedString("carb-entry-title-add", value: "Add Carb Entry", comment: "The title of the view controller to create a new carb entry")
+                content
+                    .navigationBarTitle(title, displayMode: .inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            dismissButton
                         }
-                    
-                }
-                .navigationViewStyle(StackNavigationViewStyle())
-                .frame(width: geometry.size.width)
+                        
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            continueButton
+                        }
+                    }
+                
             }
+            .navigationViewStyle(StackNavigationViewStyle())
         } else {
             content
                 .toolbar {
@@ -151,32 +148,8 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             let absorptionTimeFocused: Binding<Bool> = Binding(get: { expandedRow == .absorptionTime }, set: { expandedRow = $0 ? .absorptionTime : nil })
             
             CarbQuantityRow(quantity: $viewModel.carbsQuantity, isFocused: amountConsumedFocused, title: NSLocalizedString("Amount Consumed", comment: "Label for carb quantity entry row on carb entry screen"), preferredCarbUnit: viewModel.preferredCarbUnit)
-
-            CardSectionDivider()
             
-            DatePickerRow(date: $viewModel.time, isFocused: timerFocused, minimumDate: viewModel.minimumDate, maximumDate: viewModel.maximumDate)
-            
-            CardSectionDivider()
-            
-            FoodTypeRow(foodType: $viewModel.foodType, absorptionTime: $viewModel.absorptionTime, selectedDefaultAbsorptionTimeEmoji: $viewModel.selectedDefaultAbsorptionTimeEmoji, usesCustomFoodType: $viewModel.usesCustomFoodType, absorptionTimeWasEdited: $viewModel.absorptionTimeWasEdited, isFocused: foodTypeFocused, defaultAbsorptionTimes: viewModel.defaultAbsorptionTimes)
-            
-            CardSectionDivider()
-            
-            AIAbsorptionTimePickerRow(absorptionTime: $viewModel.absorptionTime, isFocused: absorptionTimeFocused, validDurationRange: viewModel.absorptionRimesRange, isAIGenerated: viewModel.absorptionTimeWasAIGenerated, showHowAbsorptionTimeWorks: $showHowAbsorptionTimeWorks)
-                .onReceive(viewModel.$absorptionTimeWasAIGenerated) { isAIGenerated in
-                    print("🎯 AIAbsorptionTimePickerRow received isAIGenerated: \(isAIGenerated)")
-                }
-                .padding(.bottom, 2)
-            
-            // Food Search enablement toggle (only show when Food Search is disabled)
-            if !isFoodSearchEnabled {
-                CardSectionDivider()
-                
-                FoodSearchEnableRow(isFoodSearchEnabled: $isFoodSearchEnabled)
-                    .padding(.bottom, 2)
-            }
-            
-            // Food search section - moved after Absorption Time
+            // Food search section - moved up from bottom
             if isNewEntry && isFoodSearchEnabled {
                 CardSectionDivider()
                 
@@ -240,7 +213,11 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                     viewModel.setupFoodSearchObservers()
                 }
                 
-                // Food-related rows (only show if food search is enabled)
+                CardSectionDivider()
+            }
+            
+            // Food-related rows (only show if food search is enabled)
+            if isFoodSearchEnabled {
                 // Always show servings row when food search is enabled
                 ServingsDisplayRow(
                     servings: $viewModel.numberOfServings, 
@@ -455,6 +432,30 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
                     .padding(.vertical, 8)
                 }
             } // End food search enabled section
+
+            CardSectionDivider()
+            
+            DatePickerRow(date: $viewModel.time, isFocused: timerFocused, minimumDate: viewModel.minimumDate, maximumDate: viewModel.maximumDate)
+            
+            CardSectionDivider()
+            
+            FoodTypeRow(foodType: $viewModel.foodType, absorptionTime: $viewModel.absorptionTime, selectedDefaultAbsorptionTimeEmoji: $viewModel.selectedDefaultAbsorptionTimeEmoji, usesCustomFoodType: $viewModel.usesCustomFoodType, absorptionTimeWasEdited: $viewModel.absorptionTimeWasEdited, isFocused: foodTypeFocused, defaultAbsorptionTimes: viewModel.defaultAbsorptionTimes)
+            
+            CardSectionDivider()
+            
+            AIAbsorptionTimePickerRow(absorptionTime: $viewModel.absorptionTime, isFocused: absorptionTimeFocused, validDurationRange: viewModel.absorptionRimesRange, isAIGenerated: viewModel.absorptionTimeWasAIGenerated, showHowAbsorptionTimeWorks: $showHowAbsorptionTimeWorks)
+                .onReceive(viewModel.$absorptionTimeWasAIGenerated) { isAIGenerated in
+                    print("🎯 AIAbsorptionTimePickerRow received isAIGenerated: \(isAIGenerated)")
+                }
+                .padding(.bottom, 2)
+            
+            // Food Search enablement toggle (only show when Food Search is disabled)
+            if !isFoodSearchEnabled {
+                CardSectionDivider()
+                
+                FoodSearchEnableRow(isFoodSearchEnabled: $isFoodSearchEnabled)
+                    .padding(.bottom, 2)
+            }
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 12)
@@ -488,9 +489,23 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
         
         // Use existing food selection workflow
         viewModel.selectFoodProduct(aiProduct)
-        
-        // Set the number of servings from AI analysis AFTER selecting the product
-        viewModel.numberOfServings = result.servings
+
+        // Set servings carefully to avoid double-scaling
+        if result.servings > 0 && result.servings < 0.95 {
+            // Totals already represent the measured portion; keep 1.0 serving
+            // Unless we detected a base-serving reconstruction above (medium reference).
+            if result.servingSizeDescription.localizedCaseInsensitiveContains("medium") {
+                // In base-serving mode, use the multiplier as servings
+                viewModel.numberOfServings = result.servings
+            } else {
+                viewModel.numberOfServings = 1.0
+            }
+        } else if result.servings >= 0.95 {
+            // Use provided servings (≈1 or more)
+            viewModel.numberOfServings = result.servings
+        } else {
+            viewModel.numberOfServings = 1.0
+        }
         
         // Set dynamic absorption time from AI analysis (works for both Standard and Advanced modes)
         print("🤖 AI ABSORPTION TIME DEBUG:")
@@ -517,6 +532,32 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
         } else {
             print("🤖 AI absorption time conditions not met - not setting absorption time")
         }
+
+        // Soft clamp for obvious slice-based overestimates (initialization only)
+        // Applies when description includes "medium" base and portion mentions slices (1–4)
+        if result.servingSizeDescription.localizedCaseInsensitiveContains("medium") {
+            let portionText = (result.analysisNotes ?? result.servingSizeDescription).lowercased()
+            // Extract a small slice count (1-4)
+            if portionText.contains("slice") || portionText.contains("slices") {
+                if let match = portionText.range(of: "\\b(1|2|3|4)\\b", options: .regularExpression) {
+                    let count = Int(portionText[match]) ?? 0
+                    var cap: Double = 0
+                    switch count {
+                    case 1: cap = 0.25
+                    case 2: cap = 0.35
+                    case 3, 4: cap = 0.50
+                    default: break
+                    }
+                    if cap > 0 {
+                        let aiServings = result.servings
+                        if aiServings > cap {
+                            print("🧮 Applying slice-based soft cap: AI=\(aiServings) -> cap=\(cap) for \(count) slice(s)")
+                            viewModel.numberOfServings = cap
+                        }
+                    }
+                }
+            }
+        }
     }
     
     /// Convert AI analysis result to OpenFoodFactsProduct for integration with existing workflow
@@ -527,13 +568,21 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
         // Extract actual food name for the main display, not the portion description
         let displayName = extractFoodNameFromAIResult(result)
         
-        // Calculate per-serving nutrition values for proper scaling
-        let servingsAmount = max(1.0, result.servings) // Ensure at least 1 serving to avoid division by zero
-        let carbsPerServing = result.carbohydrates / servingsAmount
-        let proteinPerServing = (result.protein ?? 0) / servingsAmount
-        let fatPerServing = (result.fat ?? 0) / servingsAmount
-        let caloriesPerServing = (result.calories ?? 0) / servingsAmount
-        let fiberPerServing = (result.fiber ?? 0) / servingsAmount
+        // Decide scaling strategy to avoid double-multiplying portions.
+        // If AI returned a fractional `servings` (e.g., 0.23 for 35g out of 150g),
+        // treat totals as already for the measured portion and DO NOT divide by servings.
+        // If servings >= ~0.95 (≈1) or > 1, we compute per‑serving values.
+        let aiServings = result.servings
+        let useTotalsAsServing = aiServings > 0 && aiServings < 0.95
+        #if DEBUG
+        print("🧮 AI scaling: servings=\(aiServings), useTotalsAsServing=\(useTotalsAsServing)")
+        #endif
+        let baseDivisor = useTotalsAsServing ? 1.0 : max(1.0, aiServings)
+        let carbsPerServing = result.carbohydrates / baseDivisor
+        let proteinPerServing = (result.protein ?? 0) / baseDivisor
+        let fatPerServing = (result.fat ?? 0) / baseDivisor
+        let caloriesPerServing = (result.calories ?? 0) / baseDivisor
+        let fiberPerServing = (result.fiber ?? 0) / baseDivisor
         
         // Create nutriments with per-serving values so they scale correctly
         let nutriments = Nutriments(
@@ -547,6 +596,36 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
         
         // Use serving size description for the "Based on" text
         let servingSizeDisplay = result.servingSizeDescription
+
+        // If AI reported a fractional portion multiplier and we also have an implied
+        // USDA base like "1 medium <fruit>", prefer base-serving semantics:
+        // - nutriments represent per-base-serving (e.g., 1 medium peach ~150g ≈ 15–16g carbs)
+        // - numberOfServings encodes the fraction (e.g., 0.25)
+        // We approximate base-serving carbs from per-100g if base looks like a medium fruit.
+        // This avoids over/under-scaling when rendering the USDA Serving line.
+        var adjustedNutriments = nutriments
+        var adjustedServings = result.servings
+        if result.servings > 0, result.servings < 0.95, servingSizeDisplay.localizedCaseInsensitiveContains("medium") {
+            // Reconstruct base-serving (1 medium) by dividing totals by the fractional servings
+            let divisor = max(result.servings, 0.01)
+            let baseCarbs = result.carbohydrates / divisor
+            let baseProtein = (result.protein ?? 0) / divisor
+            let baseFat = (result.fat ?? 0) / divisor
+            let baseCalories = (result.calories ?? 0) / divisor
+            let baseFiber = (result.fiber ?? 0) / divisor
+            adjustedNutriments = Nutriments(
+                carbohydrates: baseCarbs,
+                proteins: baseProtein > 0 ? baseProtein : nil,
+                fat: baseFat > 0 ? baseFat : nil,
+                calories: baseCalories > 0 ? baseCalories : nil,
+                sugars: nil,
+                fiber: baseFiber > 0 ? baseFiber : nil
+            )
+            adjustedServings = result.servings
+            #if DEBUG
+            print("🧮 Base-serving mode: totals => base (÷\(divisor)) => carbs=\(baseCarbs), multiplier=\(adjustedServings)")
+            #endif
+        }
         
         // Include analysis notes in categories field for display
         let analysisInfo = result.analysisNotes ?? "AI food recognition analysis"
@@ -556,7 +635,7 @@ struct CarbEntryView: View, HorizontalSizeClassOverride {
             productName: displayName.isEmpty ? "AI Analyzed Food" : displayName,
             brands: "AI Analysis",
             categories: analysisInfo,
-            nutriments: nutriments,
+            nutriments: adjustedNutriments,
             servingSize: servingSizeDisplay,
             servingQuantity: 100.0, // Use as base for per-serving calculations
             imageURL: nil,
@@ -730,6 +809,9 @@ extension CarbEntryView {
                 if !viewModel.favoriteFoods.isEmpty {
                     VStack {
                         HStack {
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.red)
+                                .font(.system(size: 16, weight: .medium))
                             Text("Choose Favorite:")
                             
                             let selectedFavorite = favoritedFoodTextFromIndex(viewModel.selectedFavoriteFoodIndex)
@@ -853,6 +935,23 @@ extension CarbEntryView {
                 .padding(.vertical, 12)
                 .background(Color(.systemIndigo).opacity(0.08))
                 .cornerRadius(12)
+                
+                // Scope readout: make clear what's being shown
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    let servingText = viewModel.selectedFoodServingSize?.lowercased() ?? "serving"
+                    if servingText.contains("medium") {
+                        Text("Carbs shown for \(String(format: "%.2f", viewModel.numberOfServings)) × 1 medium item")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Carbs shown for pictured portion")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
                 .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isAdvancedAnalysisExpanded.toggle()
@@ -1093,14 +1192,14 @@ struct ServingsDisplayRow: View {
                 HStack(spacing: 8) {
                     // Decrease button
                     Button(action: {
-                        let newValue = max(0.5, servings - 0.5)
+                        let newValue = max(0.0, (servings * 100 - 5).rounded() / 100) // step 0.05, clamp at 0.0
                         servings = newValue
                     }) {
                         Image(systemName: "minus.circle.fill")
                             .font(.title3)
-                            .foregroundColor(servings > 0.5 ? .accentColor : .secondary)
+                            .foregroundColor(servings > 0.0 ? .accentColor : .secondary)
                     }
-                    .disabled(servings <= 0.5)
+                    .disabled(servings <= 0.0)
                     
                     // Current value
                     Text(formatter.string(from: NSNumber(value: servings)) ?? "1")
@@ -1110,7 +1209,7 @@ struct ServingsDisplayRow: View {
                     
                     // Increase button
                     Button(action: {
-                        let newValue = min(10.0, servings + 0.5)
+                        let newValue = min(10.0, (servings * 100 + 5).rounded() / 100) // step 0.05
                         servings = newValue
                     }) {
                         Image(systemName: "plus.circle.fill")

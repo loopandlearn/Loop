@@ -320,6 +320,8 @@ final class CarbEntryViewModel: ObservableObject {
     func onFavoriteFoodSave(_ food: NewFavoriteFood) {
         let newStoredFood = StoredFavoriteFood(name: food.name, carbsQuantity: food.carbsQuantity, foodType: food.foodType, absorptionTime: food.absorptionTime)
         favoriteFoods.append(newStoredFood)
+        // Explicitly persist to avoid race with other view models' sinks
+        UserDefaults.standard.writeFavoriteFoods(favoriteFoods)
         selectedFavoriteFoodIndex = favoriteFoods.count - 1
     }
     
@@ -1787,4 +1789,3 @@ extension CarbEntryViewModel {
         return (totalHours, reasoning)
     }
 }
-

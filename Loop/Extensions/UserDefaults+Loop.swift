@@ -123,6 +123,21 @@ extension UserDefaults {
             }
         }
     }
+
+    /// Persist favorite foods with explicit call and lightweight logging.
+    /// Use this after user-initiated changes to avoid race conditions between multiple view models.
+    func writeFavoriteFoods(_ newValue: [StoredFavoriteFood]) {
+        do {
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(newValue)
+            set(data, forKey: Key.favoriteFoods.rawValue)
+            #if DEBUG
+            print("💾 Saved favorite foods count: \(newValue.count)")
+            #endif
+        } catch {
+            assertionFailure("Unable to encode stored favorite foods (explicit write)")
+        }
+    }
     
     var aiProvider: String {
         get {
@@ -340,7 +355,7 @@ MANDATORY REQUIREMENTS:
     
     var textSearchProvider: String {
         get {
-            return string(forKey: Key.textSearchProvider.rawValue) ?? "USDA FoodData Central"
+            return string(forKey: Key.textSearchProvider.rawValue) ?? "OpenFoodFacts (Default)"
         }
         set {
             set(newValue, forKey: Key.textSearchProvider.rawValue)
@@ -349,7 +364,7 @@ MANDATORY REQUIREMENTS:
     
     var barcodeSearchProvider: String {
         get {
-            return string(forKey: Key.barcodeSearchProvider.rawValue) ?? "OpenFoodFacts"
+            return string(forKey: Key.barcodeSearchProvider.rawValue) ?? "OpenFoodFacts (Default)"
         }
         set {
             set(newValue, forKey: Key.barcodeSearchProvider.rawValue)
@@ -358,7 +373,7 @@ MANDATORY REQUIREMENTS:
     
     var aiImageProvider: String {
         get {
-            return string(forKey: Key.aiImageProvider.rawValue) ?? "OpenAI (ChatGPT API)"
+            return string(forKey: Key.aiImageProvider.rawValue) ?? "Google (Gemini API)"
         }
         set {
             set(newValue, forKey: Key.aiImageProvider.rawValue)
