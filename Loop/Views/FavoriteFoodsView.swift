@@ -37,8 +37,7 @@ struct FavoriteFoodsView: View {
                                     onFoodDelete: viewModel.onFoodDelete(_:),
                                     carbFormatter: viewModel.carbFormatter,
                                     absorptionTimeFormatter: viewModel.absorptionTimeFormatter,
-                                    preferredCarbUnit: viewModel.preferredCarbUnit,
-                                    thumbnail: thumbnailForFood(food)
+                                    preferredCarbUnit: viewModel.preferredCarbUnit
                                 )
                                     .environment(\.editMode, self.$editMode)
                                     .listRowInsets(EdgeInsets())
